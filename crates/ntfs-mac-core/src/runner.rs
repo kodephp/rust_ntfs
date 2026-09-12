@@ -54,55 +54,26 @@ pub struct RunOptions {
 pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
     let started = Instant::now();
 
-    let child = Command::new(cmd)
+    let mut command = Command::new(cmd);
+    command
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env_remove("TERM") // Prevent tools from emitting escape codes we cannot parse.
-        .spawn();
+        .env_remove("TERM"); // Prevent tools from emitting escape codes we cannot parse.
+    for (k, v) in &opts.env_extra {
+        command.env(k, v);
+    }
+    if let Some(cwd) = &opts.cwd {
+        command.current_dir(cwd);
+    }
 
-    let child = match child {
-        Ok(c) => c,
-        Err(io) => {
-            return Err(Error::CommandFailed {
-                cmd: cmd.to_string(),
-                status: -1,
-                stderr: String::new(),
-                io: Some(io),
-            });
-        }
-    };
-
-    // Set env + cwd after spawn is not possible; do it via a wrapper.
-    // We rebuild the command if any of these are set:
-    let effective_child = if opts.env_extra.is_empty() && opts.cwd.is_none() {
-        Ok(child)
-    } else {
-        let mut new = Command::new(cmd);
-        new.args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .env_remove("TERM");
-        for (k, v) in &opts.env_extra {
-            new.env(k, v);
-        }
-        if let Some(cwd) = &opts.cwd {
-            new.current_dir(cwd);
-        }
-        match new.spawn() {
-            Ok(c) => Ok(c),
-            Err(io) => Err(Error::CommandFailed {
-                cmd: cmd.to_string(),
-                status: -1,
-                stderr: String::new(),
-                io: Some(io),
-            }),
-        }
-    };
-
-    let mut child = effective_child?;
+    let mut child = command.spawn().map_err(|io| Error::CommandFailed {
+        cmd: cmd.to_string(),
+        status: -1,
+        stderr: String::new(),
+        io: Some(io),
+    })?;
 
     // Feed stdin if provided.
     if let Some(data) = &opts.stdin_data {

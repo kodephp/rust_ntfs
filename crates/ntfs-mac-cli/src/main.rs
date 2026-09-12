@@ -77,6 +77,12 @@ enum Command {
         label: Option<String>,
         #[arg(long, default_value = "true")]
         quick: bool,
+        /// Sector size in bytes (512 or 4096)
+        #[arg(long, default_value_t = 4096u32)]
+        sector_size: u32,
+        /// Cluster size in bytes (512–65536, power of 2)
+        #[arg(long, default_value_t = 4096u32)]
+        cluster_size: u32,
         #[arg(long)]
         yes: bool,
     },
@@ -237,8 +243,21 @@ fn run(cli: &Cli) -> Result<()> {
             target,
             label,
             quick,
+            sector_size,
+            cluster_size,
             yes,
-        } => cmd_format(cli, &cfg, target, label, *quick, *yes),
+        } => cmd_format(
+            cli,
+            &cfg,
+            &FormatArgs {
+                target: target.clone(),
+                label: label.clone(),
+                quick: *quick,
+                sector_size: *sector_size,
+                cluster_size: *cluster_size,
+                yes: *yes,
+            },
+        ),
         Command::Fix { target, fsck } => cmd_fix(cli, &cfg, target, *fsck),
         Command::Copy {
             source,
@@ -390,31 +409,43 @@ fn cmd_mount(
 }
 
 fn cmd_unmount(cli: &Cli, _cfg: &Config, target: &str) -> Result<()> {
-    mount::unmount(target)?;
-    if cli.json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&serde_json::json!({ "unmounted": target }))?
-        );
-    } else {
-        println!("{} {}", "Unmounted".green().bold(), target);
-    }
-    Ok(())
-}
-
-fn cmd_format(
-    cli: &Cli,
-    cfg: &Config,
-    target: &str,
-    label: &Option<String>,
-    quick: bool,
-    yes: bool,
-) -> Result<()> {
+    // Look up by device identifier or volume name, then unmount the device.
     let volumes = device::list_volumes()?;
     let vol = volumes
         .iter()
         .find(|v| v.device_identifier == target || v.volume_name == target)
         .ok_or_else(|| anyhow::anyhow!("volume '{}' not found", target))?
+        .clone();
+    mount::unmount(&vol.device_identifier)?;
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(
+                &serde_json::json!({ "unmounted": vol.device_identifier })
+            )?
+        );
+    } else {
+        println!("{} {}", "Unmounted".green().bold(), vol.device_identifier);
+    }
+    Ok(())
+}
+
+/// Arguments for the `format` subcommand (avoids >7 params on `cmd_format`).
+struct FormatArgs {
+    target: String,
+    label: Option<String>,
+    quick: bool,
+    sector_size: u32,
+    cluster_size: u32,
+    yes: bool,
+}
+
+fn cmd_format(cli: &Cli, cfg: &Config, args: &FormatArgs) -> Result<()> {
+    let volumes = device::list_volumes()?;
+    let vol = volumes
+        .iter()
+        .find(|v| v.device_identifier == args.target || v.volume_name == args.target)
+        .ok_or_else(|| anyhow::anyhow!("volume '{}' not found", args.target))?
         .clone();
     if vol.mounted {
         return Err(anyhow::anyhow!(
@@ -422,19 +453,19 @@ fn cmd_format(
             vol.device_identifier
         ));
     }
-    let label_str = label.clone().unwrap_or_default();
+    let label_str = args.label.clone().unwrap_or_default();
     if let Some(w) = format::validate_label(&label_str) {
         eprintln!("{} {}", "warning:".yellow().bold(), w);
     }
     let opts = format::FormatOptions {
         label: label_str,
-        quick,
-        sector_size: 4096,
-        cluster_size: 4096,
+        quick: args.quick,
+        sector_size: args.sector_size,
+        cluster_size: args.cluster_size,
         extra_args: Vec::new(),
     };
     let token = DestructiveToken::new(&vol.device_identifier, &vol.volume_name);
-    if !yes && cfg.require_confirmation {
+    if !args.yes && cfg.require_confirmation {
         // If stdin is not a TTY (piped input), we can't do interactive
         // confirmation — require --yes instead.
         if !ntfs_mac_core::is_stdin_tty() {
