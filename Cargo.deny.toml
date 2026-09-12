@@ -1,0 +1,28 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/checks/licenses-config.html
+
+# Only allow licenses that are compatible with Apache-2.0.
+[licenses]
+# The allow list of licenses.
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "MIT OR Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unlicense",
+  "Zlib",
+  "OpenSSL",
+]
+
+# Direct dependencies that are allowed to use any license.
+# (Empty list means we only allow the licenses above.)
+allow-osi-fsf-free = "either"
+
+# Skip checking the workspace crates themselves.
+skip = [
+  { name = "ntfs-mac-core" },
+  { name = "ntfs-mac-cli" },
+  { name = "ntfs-mac-tauri" },
+]

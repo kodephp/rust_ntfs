@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  # ------------------------------------------------------------------
+  # Lint + test on macOS (the primary target).
+  # ------------------------------------------------------------------
+  lint-macos:
+    name: Lint (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+  # ------------------------------------------------------------------
+  # Build release binaries + macOS .pkg installer.
+  # ------------------------------------------------------------------
+  build-macos:
+    name: Build macOS installer
+    runs-on: macos-14
+    needs: lint-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: |
+          chmod +x scripts/build-macos.sh scripts/install.sh scripts/pkg-scripts/*.sh
+          ./scripts/build-macos.sh
+
+      - name: Verify pkg
+        run: |
+          ls -lh dist/ntfs-mac-*.pkg
+          pkgutil --check-signature dist/ntfs-mac-*.pkg || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ntfs-mac-macos
+          path: dist/ntfs-mac-*.pkg
+          retention-days: 30
+
+      # Attach to GitHub Release if this is a release build.
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ntfs-mac-*.pkg
+
+  # ------------------------------------------------------------------
+  # Security audit (advisory database, cross-platform).
+  # ------------------------------------------------------------------
+  audit:
+    name: Cargo audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-audit --locked
+
+      - name: Audit
+        run: cargo audit
+
+  # ------------------------------------------------------------------
+  # Dependency license check.
+  # ------------------------------------------------------------------
+  licenses:
+    name: License check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-deny --locked
+
+      - name: Deny
+        run: cargo deny check licenses

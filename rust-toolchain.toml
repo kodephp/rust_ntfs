@@ -1,0 +1,12 @@
+[toolchain]
+# Pinned to the current stable channel. MSRV is declared per-crate via
+# `rust-version` and enforced by CI. Do not bump this file casually —
+# a toolchain change should come with an explicit MSRV re-check.
+channel = "stable"
+
+[profile.release]
+# Small, portable release build for a CLI/GUI tool.
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+opt-level = 3

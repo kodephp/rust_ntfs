@@ -1,0 +1,33 @@
+# Cargo
+/target
+**/target/
+Cargo.lock
+
+# Tauri / frontend
+crates/ntfs-mac-tauri/src/
+crates/ntfs-mac-tauri/gen/
+crates/ntfs-mac-tauri/dist/
+crates/ntfs-mac-tauri/src-tauri/target/
+
+# Node
+node_modules/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.workbuddy/
+
+# OS
+.DS_Store
+
+# Changelog (local only)
+CHANGELOG.md
+
+# Local artifacts
+*.app
+*.dmg
+*.ipa
+artifacts/
+dist/

@@ -1,0 +1,76 @@
+[
+  {
+    "DeviceIdentifier": "disk0",
+    "DeviceNode": "/dev/disk0",
+    "Whole": true,
+    "Internal": true,
+    "Ejectable": false,
+    "Content": "GUID_partition_scheme",
+    "Size": 494384795648,
+    "MediaName": "APPLE SSD AP0512Q",
+    "VolumeName": "",
+    "Media": "Apple SSD",
+    "Partitions": [
+      {
+        "DeviceIdentifier": "disk0s1",
+        "DeviceNode": "/dev/disk0s1",
+        "Whole": false,
+        "Internal": true,
+        "Ejectable": false,
+        "Content": "Apple_APFS",
+        "Size": 494370152448,
+        "MediaName": "APPLE SSD AP0512Q",
+        "VolumeName": ""
+      }
+    ]
+  },
+  {
+    "DeviceIdentifier": "disk2",
+    "DeviceNode": "/dev/disk2",
+    "Whole": true,
+    "Internal": false,
+    "Ejectable": true,
+    "Content": "GUID_partition_scheme",
+    "Size": 488000000000,
+    "MediaName": "USB DISK",
+    "VolumeName": "",
+    "Partitions": [
+      {
+        "DeviceIdentifier": "disk2s1",
+        "DeviceNode": "/dev/disk2s1",
+        "Whole": false,
+        "Internal": false,
+        "Ejectable": true,
+        "Content": "Microsoft Basic Data",
+        "Size": 488000000000,
+        "MediaName": "USB DISK",
+        "VolumeName": "MYNTFS",
+        "DiskUUID": "11111111-2222-3333-4444-555555555555"
+      }
+    ]
+  },
+  {
+    "DeviceIdentifier": "disk3",
+    "DeviceNode": "/dev/disk3",
+    "Whole": true,
+    "Internal": false,
+    "Ejectable": true,
+    "Content": "GUID_partition_scheme",
+    "Size": 240000000000,
+    "MediaName": "SEAGATE BACKUP",
+    "VolumeName": "",
+    "Partitions": [
+      {
+        "DeviceIdentifier": "disk3s1",
+        "DeviceNode": "/dev/disk3s1",
+        "Whole": false,
+        "Internal": false,
+        "Ejectable": true,
+        "Content": "com.apple.hfs",
+        "Size": 240000000000,
+        "MediaName": "SEAGATE BACKUP",
+        "VolumeName": "MACOS_DATA"
+      }
+    ]
+  }
+]

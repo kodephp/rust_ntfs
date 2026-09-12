@@ -1,0 +1,70 @@
+# Workspace root. Keep the three crates in sync; the GUI crate wraps
+# the CLI crate over the core library.
+[workspace]
+resolver = "2"
+members = [
+    "crates/ntfs-mac-core",
+    "crates/ntfs-mac-cli",
+    "crates/ntfs-mac-tauri/src-tauri",
+]
+# Tauri is heavy; exclude it from default workspace builds so `cargo
+# check --workspace` stays fast for core/CLI iteration.
+default-members = [
+    "crates/ntfs-mac-core",
+    "crates/ntfs-mac-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/kodephp/rust_ntfs"
+authors = ["kodephp contributors"]
+description = "A small NTFS toolkit for macOS: mount, unmount, format, fix, copy — driven by ntfs-3g."
+
+[workspace.dependencies]
+# Internal crates.
+ntfs-mac-core = { path = "crates/ntfs-mac-core" }
+
+# CLI.
+clap = { version = "4.5", features = ["derive", "wrap_help", "color"] }
+clap_complete = { version = "4.5" }
+
+# Serialization / configuration.
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+toml = { version = "0.8" }
+
+# Error handling: thiserror for typed library errors, anyhow for
+# application-level glue (CLI + GUI). Never expose anyhow in lib.rs.
+thiserror = { version = "2" }
+anyhow = { version = "1" }
+
+# System integration.
+dirs = "5"
+plist = "1"
+iana-time-zone = "0.1"
+
+# Output / UX.
+colored = "3"
+indicatif = "0.17"
+
+# Tauri v2 (GUI crate only).
+tauri = "2"
+tauri-build = "2"
+tauri-plugin-dialog = "2"
+
+# Logging.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+# Signal handling (daemon graceful shutdown).
+signal-hook = "0.3"
+
+[profile.dev]
+# Keep debug builds usable; we still ship `strip = "debuginfo"` in
+# release so users can grab a `dSYM` if they want to inspect crashes.
+debug = true
+opt-level = 0

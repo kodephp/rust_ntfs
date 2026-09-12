@@ -1,0 +1,9 @@
+# macOS is our only target. Pin codegen settings that keep the CLI
+# single-file binary small and reproducible.
+[build]
+# Avoid accidentally shipping debuginfo in release builds.
+rustflags = []
+
+# Prefer the local target dir so parallel crates builds don't fight.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-dead_strip"]
