@@ -5,10 +5,10 @@
 class NtfsMac < Formula
   desc "NTFS toolkit for macOS: mount, unmount, format, fix, copy — with GUI"
   homepage "https://github.com/kodephp/ntfs-mac"
-  version "0.1.0"
+  version "0.1.1"
 
   # SHA256 of the .pkg at release. Update on each release.
-  url "https://github.com/kodephp/ntfs-mac/releases/download/v0.1.0/ntfs-mac-0.1.0.pkg"
+  url "https://github.com/kodephp/ntfs-mac/releases/download/v0.1.1/ntfs-mac-0.1.1.pkg"
   sha256 "REPLACE_WITH_ACTUAL_SHA256"
 
   license "Apache-2.0"

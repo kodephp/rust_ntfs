@@ -1,8 +1,8 @@
-/// Synthetic plist test fixture for device::parse_diskutil_plist.
-///
-/// The `plist` crate's `from_reader` expects binary or XML plist format,
-/// not JSON. We write a proper XML plist fixture that mimics the real
-/// `diskutil list -plist` output structure.
+// Synthetic plist test fixture for device::parse_diskutil_plist.
+//
+// The `plist` crate's `from_reader` expects binary or XML plist format,
+// not JSON. We write a proper XML plist fixture that mimics the real
+// `diskutil list -plist` output structure.
 
 #[cfg(test)]
 mod tests {

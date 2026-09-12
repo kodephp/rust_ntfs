@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(pretty_size(2048), "2.0 KiB");
         assert_eq!(pretty_size(3 * 1024 * 1024), "3.0 MiB");
         assert_eq!(pretty_size(2 * 1024usize.pow(3) as u64), "2.0 GiB");
-        assert_eq!(pretty_size(1 * 1024usize.pow(4) as u64), "1.0 TiB");
+        assert_eq!(pretty_size(1024usize.pow(4) as u64), "1.0 TiB");
     }
 
     #[test]
@@ -459,9 +459,9 @@ map auto_home on /System/Volumes/Data/home (autofs, automounted, nobrowse)
             Some("/Volumes/MyData")
         );
         // Non-/dev entries are ignored.
-        assert!(map.get("devfs").is_none());
-        assert!(map.get("auto_home").is_none());
-        assert!(map.get("map").is_none());
+        assert!(!map.contains_key("devfs"));
+        assert!(!map.contains_key("auto_home"));
+        assert!(!map.contains_key("map"));
     }
 
     #[test]

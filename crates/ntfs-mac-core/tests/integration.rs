@@ -103,10 +103,12 @@ fn config_round_trip() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("config.toml");
 
-    let mut cfg = Config::default();
-    cfg.mount_base = "/Volumes/Backup".into();
-    cfg.require_confirmation = false;
-    cfg.mount_options = vec!["noowners".into(), "uid=501".into()];
+    let cfg = Config {
+        mount_base: "/Volumes/Backup".into(),
+        require_confirmation: false,
+        mount_options: vec!["noowners".into(), "uid=501".into()],
+        ..Default::default()
+    };
     config::save_config(&cfg, &path).unwrap();
 
     let loaded = config::load_config(&path).unwrap();

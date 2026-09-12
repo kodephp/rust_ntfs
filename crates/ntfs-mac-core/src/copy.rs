@@ -90,7 +90,9 @@ fn copy_with_rsync(src: &Path, dst: &Path, opts: &CopyOptions) -> Result<CopyOut
         args.push("-rt".into());
     }
     if opts.progress {
-        args.push("--info=progress2".into());
+        // macOS ships rsync 2.6.9 which lacks --info=progress2;
+        // use --progress (universally supported).
+        args.push("--progress".into());
     }
     if opts.dry_run {
         args.push("--dry-run".into());

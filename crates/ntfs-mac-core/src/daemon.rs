@@ -308,14 +308,14 @@ fn generate_launchagent_plist(binary_path: &str) -> String {
     )
 }
 
-// --- Logging ---
+// --- Logging (uses tracing for consistent structured output) ---
 
 fn log_info(msg: &str) {
-    eprintln!("[daemon] {msg}");
+    tracing::info!(target: "ntfs_mac_core::daemon", "{msg}");
 }
 
 fn log_warn(msg: &str) {
-    eprintln!("[daemon] WARN {msg}");
+    tracing::warn!(target: "ntfs_mac_core::daemon", "{msg}");
 }
 
 #[cfg(test)]

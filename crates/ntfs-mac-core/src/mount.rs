@@ -175,7 +175,7 @@ fn build_mount_options(vol: &Volume, opts: &MountOptions, cfg: &Config) -> Vec<S
 }
 
 /// Try `diskutil mount -o <opts> <dev> <mount_point>`. Returns
-// `true` if it succeeded. Never returns an error — callers decide
+/// `true` if it succeeded. Never returns an error — callers decide
 /// whether to fall back.
 fn diskutil_mount(dev_path: &str, mount_point: &str, opts: &[String]) -> bool {
     use crate::runner::run;

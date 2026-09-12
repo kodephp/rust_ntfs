@@ -74,6 +74,23 @@ pub fn format(
         )));
     }
 
+    // Validate sector_size and cluster_size are sensible values.
+    if opts.sector_size != 512 && opts.sector_size != 4096 {
+        return Err(Error::InvalidArgument(format!(
+            "invalid sector_size {}: expected 512 or 4096",
+            opts.sector_size
+        )));
+    }
+    if !matches!(
+        opts.cluster_size,
+        512 | 1024 | 2048 | 4096 | 8192 | 16384 | 32768 | 65536
+    ) {
+        return Err(Error::InvalidArgument(format!(
+            "invalid cluster_size {}: expected power-of-2 between 512 and 65536",
+            opts.cluster_size
+        )));
+    }
+
     // Prefer newfs_ntfs; fall back to mkntfs if not present.
     let (bin_name, bin_path) = match crate::runner::which("newfs_ntfs") {
         Ok(p) => ("newfs_ntfs", p),
@@ -201,6 +218,56 @@ mod tests {
         let cfg = Config::default();
         let opts = FormatOptions::default();
         let token = DestructiveToken::new("notdisk", "");
+        let r = format(&vol, &opts, &token, &cfg);
+        assert!(matches!(r, Err(Error::InvalidArgument(_))));
+    }
+
+    #[test]
+    fn format_rejects_invalid_sector_size() {
+        let vol = Volume {
+            device_identifier: "disk2s2".into(),
+            volume_name: "X".into(),
+            media_type: "com.microsoft.ntfs".into(),
+            uuid: None,
+            size_bytes: 0,
+            mounted: false,
+            mount_point: None,
+            parent_disk: None,
+            size_pretty: "0 B".into(),
+            location: "external".into(),
+            contents: None,
+        };
+        let cfg = Config::default();
+        let opts = FormatOptions {
+            sector_size: 2048, // invalid
+            ..Default::default()
+        };
+        let token = DestructiveToken::new("disk2s2", "");
+        let r = format(&vol, &opts, &token, &cfg);
+        assert!(matches!(r, Err(Error::InvalidArgument(_))));
+    }
+
+    #[test]
+    fn format_rejects_invalid_cluster_size() {
+        let vol = Volume {
+            device_identifier: "disk2s2".into(),
+            volume_name: "X".into(),
+            media_type: "com.microsoft.ntfs".into(),
+            uuid: None,
+            size_bytes: 0,
+            mounted: false,
+            mount_point: None,
+            parent_disk: None,
+            size_pretty: "0 B".into(),
+            location: "external".into(),
+            contents: None,
+        };
+        let cfg = Config::default();
+        let opts = FormatOptions {
+            cluster_size: 1000, // not a power of 2
+            ..Default::default()
+        };
+        let token = DestructiveToken::new("disk2s2", "");
         let r = format(&vol, &opts, &token, &cfg);
         assert!(matches!(r, Err(Error::InvalidArgument(_))));
     }

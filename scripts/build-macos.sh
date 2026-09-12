@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.1}"
 BUNDLE_ID="com.kodephp.ntfs-mac"
 APP_NAME="ntfs-mac"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

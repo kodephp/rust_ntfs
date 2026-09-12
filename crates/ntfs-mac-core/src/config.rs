@@ -140,10 +140,12 @@ mod tests {
     fn round_trip_persists_fields() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
-        let mut cfg = Config::default();
-        cfg.mount_base = "/tmp/vol".into();
-        cfg.mount_options.push("noowners".into());
-        cfg.require_confirmation = false;
+        let cfg = Config {
+            mount_base: "/tmp/vol".into(),
+            mount_options: vec!["noowners".into()],
+            require_confirmation: false,
+            ..Default::default()
+        };
         save_config(&cfg, &path).unwrap();
         let loaded = load_config(&path).unwrap();
         assert_eq!(loaded.mount_base, "/tmp/vol");
