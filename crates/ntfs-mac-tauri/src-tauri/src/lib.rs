@@ -904,13 +904,6 @@ fn fix_volume(device_id: String, use_fsck: bool) -> tauri::Result<()> {
     fix::fix_with_opts(vol, &opts).map_err(e)
 }
 
-/// The current config file as JSON.
-#[tauri::command]
-fn get_config() -> tauri::Result<serde_json::Value> {
-    let config = Config::load().map_err(e)?;
-    serde_json::to_value(&config).map_err(e)
-}
-
 /// Reveal a volume in Finder — its mount point when mounted, else `/dev/<id>`.
 #[tauri::command]
 fn open_in_finder(app: AppHandle, device_id: String) -> tauri::Result<String> {
@@ -968,12 +961,6 @@ fn app_info() -> tauri::Result<AppInfo> {
     })
 }
 
-/// Current UI language (`"zh"` or `"en"`).
-#[tauri::command]
-fn get_language(state: State<AppState>) -> tauri::Result<String> {
-    Ok(state.language())
-}
-
 /// Switch UI language. Updates the window and rebuilds the tray labels.
 #[tauri::command]
 fn set_language(state: State<AppState>, app: AppHandle, language: String) -> tauri::Result<()> {
@@ -1003,6 +990,12 @@ fn refresh_menu(app: AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // A second launch (double-clicking the icon again, or a stale process
+        // left over from a previous install) must not open a second window with
+        // a second tray icon — bring the existing window forward instead.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_window(app);
+        }))
         .manage(AppState::default())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -1027,12 +1020,10 @@ pub fn run() {
             unmount_volume,
             format_volume,
             fix_volume,
-            get_config,
             open_in_finder,
             eject_volume,
             install_dependencies,
             app_info,
-            get_language,
             set_language,
             refresh_menu,
         ])

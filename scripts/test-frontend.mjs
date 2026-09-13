@@ -10,6 +10,11 @@
 //    never drift apart.
 // 4. zh and en expose the same key set.
 // 5. No stale references (`window.__TAURI__.core`, sponsor QR) remain.
+// 6. Every backend call is bounded: no raw `invoke()`, and each command has an
+//    explicit ceiling in `CALL_TIMEOUT_MS`.
+// 7. UI ↔ API contract: the commands the window calls are exactly the commands
+//    the backend registers — no dead handlers, no calls to commands that do
+//    not exist.
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -207,6 +212,61 @@ if (foundLegacy.length) {
     fail(`index.html still shows legacy English copy: ${foundLegacy.join(", ")}`);
 }
 ok("no stale references; index.html defaults to Chinese");
+
+// ---------------------------------------------------------------------------
+// 6. Every backend call is bounded by the timeout wrapper
+//
+// A raw invoke() with a literal command name is a regression: it means a call
+// can hang the UI with nothing to time it out.
+// ---------------------------------------------------------------------------
+
+if (/invoke\("/.test(js)) {
+    fail("app.js has a raw invoke() with a literal command name; wrap it in call()");
+}
+
+const timeoutTable = extractObject(js, "CALL_TIMEOUT_MS");
+if (!timeoutTable) {
+    fail("app.js no longer defines CALL_TIMEOUT_MS — every call needs a ceiling");
+} else {
+    const listed = new Set(
+        [...timeoutTable.matchAll(/^\s{4}([a-z_][a-z_0-9]*):\s*\d/mg)].map((m) => m[1])
+    );
+    const called = new Set(
+        [...js.matchAll(/call\("([a-z_][a-z_0-9]*)"/g)].map((m) => m[1])
+    );
+    const untimed = [...called].filter((c) => !listed.has(c));
+    if (untimed.length) {
+        fail(`commands with no explicit timeout ceiling: ${untimed.join(", ")}`);
+    } else {
+        ok(`all ${called.size} backend calls are bounded by CALL_TIMEOUT_MS`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7. UI ↔ API contract: window and backend agree on the command set
+// ---------------------------------------------------------------------------
+
+const handlerBlock = rust.match(/tauri::generate_handler!\[([\s\S]*?)\]/);
+if (!handlerBlock) {
+    console.error("FATAL: could not locate generate_handler! in lib.rs");
+    process.exit(1);
+}
+const registered = [...handlerBlock[1].matchAll(/\b([a-z_][a-z_0-9]*)\b/g)].map((m) => m[1]);
+const usedByUi = new Set(
+    [...js.matchAll(/call\("([a-z_][a-z_0-9]*)"/g)].map((m) => m[1])
+);
+
+const deadCommands = registered.filter((c) => !usedByUi.has(c));
+const ghostCommands = [...usedByUi].filter((c) => !registered.includes(c));
+if (deadCommands.length) {
+    fail(`registered but never called by the window: ${deadCommands.join(", ")}`);
+}
+if (ghostCommands.length) {
+    fail(`called by the window but not registered: ${ghostCommands.join(", ")}`);
+}
+if (!deadCommands.length && !ghostCommands.length) {
+    ok(`${registered.length} commands: UI and backend agree exactly`);
+}
 
 // ---------------------------------------------------------------------------
 // Result

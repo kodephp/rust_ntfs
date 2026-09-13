@@ -7,7 +7,7 @@ each shipped artifact statically links the Rust crates listed below.
 This file is the attribution inventory for those crates.
 
 - Generated: 2026-09-13
-- Crates: 491 total, 87 CLI, 451 GUI
+- Crates: 525 total, 87 CLI, 488 GUI
 - Source: `cargo metadata` (honouring `Cargo.lock`) reduced to packages
   reachable over *runtime* edges; `dev`-only edges are excluded, so the
   list matches what ships rather than the whole test matrix
@@ -30,9 +30,9 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | License | Crates |
 | --- | ---: |
 | Apache-2.0 | 2 |
-| MIT | 109 |
-| MIT OR Apache-2.0 | 241 |
-| Apache-2.0 OR MIT | 36 |
+| MIT | 118 |
+| MIT OR Apache-2.0 | 251 |
+| Apache-2.0 OR MIT | 51 |
 | BSD-3-Clause | 2 |
 | ISC | 1 |
 | Zlib | 2 |
@@ -89,6 +89,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | dlopen2_derive | 0.4.3 |  | ✓ | [https://github.com/OpenByteDev/dlopen2](https://github.com/OpenByteDev/dlopen2) |
 | dom_query | 0.27.0 |  | ✓ | [https://github.com/niklak/dom_query](https://github.com/niklak/dom_query) |
 | embed-resource | 3.0.11 |  | ✓ | [https://github.com/nabijaczleweli/rust-embed-resource](https://github.com/nabijaczleweli/rust-embed-resource) |
+| endi | 1.1.1 |  | ✓ | [https://github.com/zeenix/endi](https://github.com/zeenix/endi) |
 | gdk | 0.18.2 |  | ✓ | [https://github.com/gtk-rs/gtk3-rs](https://github.com/gtk-rs/gtk3-rs) |
 | gdk-pixbuf | 0.18.5 |  | ✓ | [https://github.com/gtk-rs/gtk-rs-core](https://github.com/gtk-rs/gtk-rs-core) |
 | gdk-pixbuf-sys | 0.18.0 |  | ✓ | [https://github.com/gtk-rs/gtk-rs-core](https://github.com/gtk-rs/gtk-rs-core) |
@@ -162,6 +163,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | tracing-log | 0.2.0 | ✓ |  | [https://github.com/tokio-rs/tracing](https://github.com/tokio-rs/tracing) |
 | tracing-subscriber | 0.3.23 | ✓ |  | [https://github.com/tokio-rs/tracing](https://github.com/tokio-rs/tracing) |
 | try-lock | 0.2.5 |  | ✓ | [https://github.com/seanmonstar/try-lock](https://github.com/seanmonstar/try-lock) |
+| uds_windows | 1.2.1 |  | ✓ | [https://github.com/haraldh/rust_uds_windows](https://github.com/haraldh/rust_uds_windows) |
 | urlpattern | 0.3.0 |  | ✓ | [https://github.com/denoland/rust-urlpattern](https://github.com/denoland/rust-urlpattern) |
 | valuable | 0.1.1 | ✓ | ✓ | [https://github.com/tokio-rs/valuable](https://github.com/tokio-rs/valuable) |
 | version-compare | 0.2.1 |  | ✓ | [https://gitlab.com/timvisee/version-compare](https://gitlab.com/timvisee/version-compare) |
@@ -179,7 +181,14 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | winreg | 0.55.0 |  | ✓ | [https://github.com/gentoo90/winreg-rs](https://github.com/gentoo90/winreg-rs) |
 | x11 | 2.21.0 |  | ✓ | [https://github.com/AltF02/x11-rs.git](https://github.com/AltF02/x11-rs.git) |
 | x11-dl | 2.21.0 |  | ✓ | [https://github.com/AltF02/x11-rs.git](https://github.com/AltF02/x11-rs.git) |
+| zbus | 5.19.0 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
+| zbus_macros | 5.19.0 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
+| zbus_names | 4.3.4 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
+| zcheapstr | 1.1.0 |  | ✓ | [https://github.com/z-galaxy/zcheapstr/](https://github.com/z-galaxy/zcheapstr/) |
 | zmij | 1.0.23 | ✓ | ✓ | [https://github.com/dtolnay/zmij](https://github.com/dtolnay/zmij) |
+| zvariant | 5.15.0 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
+| zvariant_derive | 5.15.0 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
+| zvariant_utils | 4.2.0 |  | ✓ | [https://github.com/z-galaxy/zbus/](https://github.com/z-galaxy/zbus/) |
 
 ### MIT OR Apache-2.0
 
@@ -192,6 +201,9 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | anstyle-query | 1.1.5 | ✓ |  | [https://github.com/rust-cli/anstyle.git](https://github.com/rust-cli/anstyle.git) |
 | anstyle-wincon | 3.0.11 | ✓ |  | [https://github.com/rust-cli/anstyle.git](https://github.com/rust-cli/anstyle.git) |
 | anyhow | 1.0.104 | ✓ | ✓ | [https://github.com/dtolnay/anyhow](https://github.com/dtolnay/anyhow) |
+| async-broadcast | 0.7.2 |  | ✓ | [https://github.com/smol-rs/async-broadcast](https://github.com/smol-rs/async-broadcast) |
+| async-recursion | 1.1.1 |  | ✓ | [https://github.com/dcchut/async-recursion](https://github.com/dcchut/async-recursion) |
+| async-trait | 0.1.92 |  | ✓ | [https://github.com/dtolnay/async-trait](https://github.com/dtolnay/async-trait) |
 | base64 | 0.21.7 |  | ✓ | [https://github.com/marshallpierce/rust-base64](https://github.com/marshallpierce/rust-base64) |
 | base64 | 0.22.1 |  | ✓ | [https://github.com/marshallpierce/rust-base64](https://github.com/marshallpierce/rust-base64) |
 | base64 | 0.23.1 |  | ✓ | [https://github.com/marshallpierce/rust-base64](https://github.com/marshallpierce/rust-base64) |
@@ -233,8 +245,10 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | dtoa | 1.0.11 |  | ✓ | [https://github.com/dtolnay/dtoa](https://github.com/dtolnay/dtoa) |
 | dyn-clone | 1.0.20 |  | ✓ | [https://github.com/dtolnay/dyn-clone](https://github.com/dtolnay/dyn-clone) |
 | embed_plist | 1.2.2 |  | ✓ | [https://github.com/nvzqz/embed-plist-rs](https://github.com/nvzqz/embed-plist-rs) |
+| enumflags2 | 0.7.12 |  | ✓ | [https://github.com/meithecatte/enumflags2](https://github.com/meithecatte/enumflags2) |
+| enumflags2_derive | 0.7.12 |  | ✓ | [https://github.com/meithecatte/enumflags2](https://github.com/meithecatte/enumflags2) |
 | erased-serde | 0.4.10 |  | ✓ | [https://github.com/dtolnay/erased-serde](https://github.com/dtolnay/erased-serde) |
-| errno | 0.3.14 | ✓ |  | [https://github.com/lambda-fairy/rust-errno](https://github.com/lambda-fairy/rust-errno) |
+| errno | 0.3.14 | ✓ | ✓ | [https://github.com/lambda-fairy/rust-errno](https://github.com/lambda-fairy/rust-errno) |
 | fdeflate | 0.3.7 |  | ✓ | [https://github.com/image-rs/fdeflate](https://github.com/image-rs/fdeflate) |
 | field-offset | 0.3.6 |  | ✓ | [https://github.com/Diggsey/rust-field-offset](https://github.com/Diggsey/rust-field-offset) |
 | find-msvc-tools | 0.1.12 |  | ✓ | [https://github.com/rust-lang/cc-rs](https://github.com/rust-lang/cc-rs) |
@@ -256,6 +270,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | hashbrown | 0.17.1 |  | ✓ | [https://github.com/rust-lang/hashbrown](https://github.com/rust-lang/hashbrown) |
 | heck | 0.4.1 |  | ✓ | [https://github.com/withoutboats/heck](https://github.com/withoutboats/heck) |
 | heck | 0.5.0 | ✓ | ✓ | [https://github.com/withoutboats/heck](https://github.com/withoutboats/heck) |
+| hermit-abi | 0.5.3 |  | ✓ | [https://github.com/hermit-os/hermit-rs](https://github.com/hermit-os/hermit-rs) |
 | hex | 0.4.3 |  | ✓ | [https://github.com/KokaKiwi/rust-hex](https://github.com/KokaKiwi/rust-hex) |
 | html5ever | 0.38.0 |  | ✓ | [https://github.com/servo/html5ever](https://github.com/servo/html5ever) |
 | http | 1.5.0 |  | ✓ | [https://github.com/hyperium/http](https://github.com/hyperium/http) |
@@ -285,9 +300,11 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | num-traits | 0.2.19 |  | ✓ | [https://github.com/rust-num/num-traits](https://github.com/rust-num/num-traits) |
 | once_cell | 1.21.4 | ✓ | ✓ | [https://github.com/matklad/once_cell](https://github.com/matklad/once_cell) |
 | once_cell_polyfill | 1.70.2 | ✓ |  | [https://github.com/polyfill-rs/once_cell_polyfill](https://github.com/polyfill-rs/once_cell_polyfill) |
+| ordered-stream | 0.2.0 |  | ✓ | [https://github.com/danieldg/ordered-stream](https://github.com/danieldg/ordered-stream) |
 | parking_lot | 0.12.5 |  | ✓ | [https://github.com/Amanieu/parking_lot](https://github.com/Amanieu/parking_lot) |
 | parking_lot_core | 0.9.12 |  | ✓ | [https://github.com/Amanieu/parking_lot](https://github.com/Amanieu/parking_lot) |
 | percent-encoding | 2.3.2 |  | ✓ | [https://github.com/servo/rust-url/](https://github.com/servo/rust-url/) |
+| piper | 0.2.5 |  | ✓ | [https://github.com/smol-rs/piper](https://github.com/smol-rs/piper) |
 | pkg-config | 0.3.34 |  | ✓ | [https://github.com/rust-lang/pkg-config-rs](https://github.com/rust-lang/pkg-config-rs) |
 | png | 0.17.16 |  | ✓ | [https://github.com/image-rs/image-png](https://github.com/image-rs/image-png) |
 | png | 0.18.1 |  | ✓ | [https://github.com/image-rs/image-png](https://github.com/image-rs/image-png) |
@@ -325,6 +342,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | servo_arc | 0.4.3 |  | ✓ | [https://github.com/servo/stylo](https://github.com/servo/stylo) |
 | sha2 | 0.10.9 |  | ✓ | [https://github.com/RustCrypto/hashes](https://github.com/RustCrypto/hashes) |
 | shlex | 2.0.1 |  | ✓ | [https://github.com/comex/rust-shlex](https://github.com/comex/rust-shlex) |
+| signal-hook-registry | 1.4.8 |  | ✓ | [https://github.com/vorner/signal-hook](https://github.com/vorner/signal-hook) |
 | smallvec | 1.16.1 | ✓ | ✓ | [https://github.com/servo/rust-smallvec](https://github.com/servo/rust-smallvec) |
 | socket2 | 0.6.5 |  | ✓ | [https://github.com/rust-lang/socket2](https://github.com/rust-lang/socket2) |
 | softbuffer | 0.4.8 |  | ✓ | [https://github.com/rust-windowing/softbuffer](https://github.com/rust-windowing/softbuffer) |
@@ -337,6 +355,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | syn | 3.0.5 | ✓ | ✓ | [https://github.com/dtolnay/syn](https://github.com/dtolnay/syn) |
 | system-deps | 6.2.2 |  | ✓ | [https://github.com/gdesmott/system-deps](https://github.com/gdesmott/system-deps) |
 | tao-macros | 0.1.4 |  | ✓ | [https://github.com/tauri-apps/tao](https://github.com/tauri-apps/tao) |
+| tempfile | 3.27.0 |  | ✓ | [https://github.com/Stebalien/tempfile](https://github.com/Stebalien/tempfile) |
 | tendril | 0.5.1 |  | ✓ | [https://github.com/servo/html5ever](https://github.com/servo/html5ever) |
 | terminal_size | 0.4.4 | ✓ |  | [https://github.com/eminence/terminal-size](https://github.com/eminence/terminal-size) |
 | thiserror | 1.0.69 | ✓ | ✓ | [https://github.com/dtolnay/thiserror](https://github.com/dtolnay/thiserror) |
@@ -431,24 +450,38 @@ with `scripts/gen-third-party-licenses.sh --check`.
 
 | Crate | Version | CLI | GUI | Repository |
 | --- | --- | :---: | :---: | --- |
+| async-channel | 2.5.0 |  | ✓ | [https://github.com/smol-rs/async-channel](https://github.com/smol-rs/async-channel) |
+| async-executor | 1.14.0 |  | ✓ | [https://github.com/smol-rs/async-executor](https://github.com/smol-rs/async-executor) |
+| async-io | 2.6.0 |  | ✓ | [https://github.com/smol-rs/async-io](https://github.com/smol-rs/async-io) |
+| async-lock | 3.4.2 |  | ✓ | [https://github.com/smol-rs/async-lock](https://github.com/smol-rs/async-lock) |
+| async-process | 2.5.0 |  | ✓ | [https://github.com/smol-rs/async-process](https://github.com/smol-rs/async-process) |
+| async-signal | 0.2.14 |  | ✓ | [https://github.com/smol-rs/async-signal](https://github.com/smol-rs/async-signal) |
+| async-task | 4.7.1 |  | ✓ | [https://github.com/smol-rs/async-task](https://github.com/smol-rs/async-task) |
 | atomic-waker | 1.1.2 |  | ✓ | [https://github.com/smol-rs/atomic-waker](https://github.com/smol-rs/atomic-waker) |
 | autocfg | 1.5.1 |  | ✓ | [https://github.com/cuviper/autocfg](https://github.com/cuviper/autocfg) |
 | bit-set | 0.8.0 |  | ✓ | [https://github.com/contain-rs/bit-set](https://github.com/contain-rs/bit-set) |
 | bit-vec | 0.8.0 |  | ✓ | [https://github.com/contain-rs/bit-vec](https://github.com/contain-rs/bit-vec) |
+| blocking | 1.7.0 |  | ✓ | [https://github.com/smol-rs/blocking](https://github.com/smol-rs/blocking) |
 | cargo_toml | 0.22.3 |  | ✓ | [https://gitlab.com/lib.rs/cargo_toml](https://gitlab.com/lib.rs/cargo_toml) |
+| concurrent-queue | 2.5.0 |  | ✓ | [https://github.com/smol-rs/concurrent-queue](https://github.com/smol-rs/concurrent-queue) |
 | ctor | 0.8.0 |  | ✓ | [https://github.com/mmastrac/rust-ctor](https://github.com/mmastrac/rust-ctor) |
 | ctor-proc-macro | 0.0.7 |  | ✓ | [https://github.com/mmastrac/rust-ctor](https://github.com/mmastrac/rust-ctor) |
 | dtor | 0.3.0 |  | ✓ | [https://github.com/mmastrac/rust-ctor](https://github.com/mmastrac/rust-ctor) |
 | dtor-proc-macro | 0.0.6 |  | ✓ | [https://github.com/mmastrac/rust-ctor](https://github.com/mmastrac/rust-ctor) |
 | equivalent | 1.0.2 |  | ✓ | [https://github.com/indexmap-rs/equivalent](https://github.com/indexmap-rs/equivalent) |
+| event-listener | 5.4.2 |  | ✓ | [https://github.com/smol-rs/event-listener](https://github.com/smol-rs/event-listener) |
+| event-listener-strategy | 0.5.4 |  | ✓ | [https://github.com/smol-rs/event-listener-strategy](https://github.com/smol-rs/event-listener-strategy) |
 | fastrand | 2.5.0 |  | ✓ | [https://github.com/smol-rs/fastrand](https://github.com/smol-rs/fastrand) |
+| futures-lite | 2.6.1 |  | ✓ | [https://github.com/smol-rs/futures-lite](https://github.com/smol-rs/futures-lite) |
 | idna_adapter | 1.2.2 |  | ✓ | [https://github.com/hsivonen/idna_adapter](https://github.com/hsivonen/idna_adapter) |
 | indexmap | 1.9.3 |  | ✓ | [https://github.com/bluss/indexmap](https://github.com/bluss/indexmap) |
 | indexmap | 2.14.2 |  | ✓ | [https://github.com/indexmap-rs/indexmap](https://github.com/indexmap-rs/indexmap) |
 | libappindicator | 0.9.0 |  | ✓ | — |
 | libappindicator-sys | 0.9.0 |  | ✓ | — |
 | muda | 0.19.3 |  | ✓ | [https://github.com/tauri-apps/muda](https://github.com/tauri-apps/muda) |
+| parking | 2.2.1 |  | ✓ | [https://github.com/smol-rs/parking](https://github.com/smol-rs/parking) |
 | pin-project-lite | 0.2.17 | ✓ | ✓ | [https://github.com/taiki-e/pin-project-lite](https://github.com/taiki-e/pin-project-lite) |
+| polling | 3.11.0 |  | ✓ | [https://github.com/smol-rs/polling](https://github.com/smol-rs/polling) |
 | portable-atomic | 1.15.0 |  | ✓ | [https://github.com/taiki-e/portable-atomic](https://github.com/taiki-e/portable-atomic) |
 | portable-atomic-util | 0.2.8 |  | ✓ | [https://github.com/taiki-e/portable-atomic-util](https://github.com/taiki-e/portable-atomic-util) |
 | rustc-hash | 2.1.3 |  | ✓ | [https://github.com/rust-lang/rustc-hash](https://github.com/rust-lang/rustc-hash) |
@@ -459,6 +492,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | tauri-plugin | 2.6.3 |  | ✓ | [https://github.com/tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | tauri-plugin-dialog | 2.7.3 |  | ✓ | [https://github.com/tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | tauri-plugin-fs | 2.5.2 |  | ✓ | [https://github.com/tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
+| tauri-plugin-single-instance | 2.4.4 |  | ✓ | [https://github.com/tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | tauri-runtime | 2.11.3 |  | ✓ | [https://github.com/tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | tauri-runtime-wry | 2.11.4 |  | ✓ | [https://github.com/tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | tauri-utils | 2.9.3 |  | ✓ | [https://github.com/tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
@@ -522,8 +556,8 @@ with `scripts/gen-third-party-licenses.sh --check`.
 
 | Crate | Version | CLI | GUI | Repository |
 | --- | --- | :---: | :---: | --- |
-| linux-raw-sys | 0.12.1 | ✓ |  | [https://github.com/sunfishcode/linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) |
-| rustix | 1.1.4 | ✓ |  | [https://github.com/bytecodealliance/rustix](https://github.com/bytecodealliance/rustix) |
+| linux-raw-sys | 0.12.1 | ✓ | ✓ | [https://github.com/sunfishcode/linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) |
+| rustix | 1.1.4 | ✓ | ✓ | [https://github.com/bytecodealliance/rustix](https://github.com/bytecodealliance/rustix) |
 | wasi | 0.11.1+wasi-snapshot-preview1 | ✓ | ✓ | [https://github.com/bytecodealliance/wasi](https://github.com/bytecodealliance/wasi) |
 | wasip2 | 1.0.4+wasi-0.2.12 |  | ✓ | [https://github.com/bytecodealliance/wasi-rs](https://github.com/bytecodealliance/wasi-rs) |
 | wit-bindgen | 0.57.1 |  | ✓ | [https://github.com/bytecodealliance/wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) |
@@ -691,4 +725,4 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | objc2-web-kit | 0.3.2 |  | ✓ | [https://github.com/madsmtm/objc2](https://github.com/madsmtm/objc2) |
 | tinyvec | 1.13.2 |  | ✓ | [https://github.com/Lokathor/tinyvec](https://github.com/Lokathor/tinyvec) |
 
-Total: 491 crates.
+Total: 525 crates.

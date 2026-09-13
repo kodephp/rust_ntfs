@@ -13,6 +13,109 @@ const invoke = internals.invoke;
 const listen = internals.event.listen;
 
 // ---------------------------------------------------------------------------
+// Backend calls — every invoke is bounded and shape-checked.
+//
+// A stalled command used to leave the window on "检测中…" forever, because
+// nothing on either side had a deadline. The Rust side now bounds each
+// subprocess (see `PROBE_TIMEOUT` / `CMD_TIMEOUT` in ntfs-mac-core), and this
+// table bounds the IPC round-trip on top of it. Values are deliberately
+// *above* the backend's own ceilings so a slow disk is never blamed on the
+// interface — but all finite, so the UI can never spin without reporting back.
+// ---------------------------------------------------------------------------
+
+const CALL_TIMEOUT_MS = {
+    check_deps: 15000,      // backend probe 5s + IPC overhead
+    list_volumes: 30000,    // diskutil 15s + mount 5s
+    mount_volume: 45000,    // CMD_TIMEOUT 30s
+    unmount_volume: 45000,
+    eject_volume: 45000,
+    open_in_finder: 20000,
+    fix_volume: 300000,     // fsck_ntfs on a large volume is slow by design
+    format_volume: 300000,
+    install_dependencies: 30000,
+    refresh_menu: 15000,
+    set_language: 10000,
+    get_language: 5000,
+    get_config: 10000,
+    app_info: 10000,
+};
+
+const DEFAULT_CALL_TIMEOUT_MS = 30000;
+
+/** Ceiling for one command; unlisted commands fall back to the default. */
+function callTimeoutMs(cmd) {
+    const limit = CALL_TIMEOUT_MS[cmd];
+    return typeof limit === "number" ? limit : DEFAULT_CALL_TIMEOUT_MS;
+}
+
+/**
+ * `invoke` with a deadline. Rejects with a human-readable message when the
+ * backend does not answer in time, so a failure is always surfaced as text
+ * instead of an endless spinner.
+ */
+async function call(cmd, args) {
+    const limit = callTimeoutMs(cmd);
+    let timer;
+    try {
+        return await Promise.race([
+            invoke(cmd, args),
+            new Promise((_, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error(tr("ui.err_timeout", {
+                        secs: Math.round(limit / 1000),
+                    })));
+                }, limit);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Response-shape validation
+//
+// `call()` only proves the backend answered. These guards prove it answered
+// with the shape this UI was written against — a contract drift then reads as
+// "接口返回异常" plus the keys actually received, instead of silently
+// rendering `undefined` all over the page.
+// ---------------------------------------------------------------------------
+
+/** Throw a descriptive error when the value is not the expected shape. */
+function expectShape(got, predicate, want) {
+    if (!predicate(got)) {
+        const found = got === null || got === undefined
+            ? String(got)
+            : Array.isArray(got)
+                ? `数组(${got.length})`
+                : typeof got === "object"
+                    ? `[${Object.keys(got).join(",")}]`
+                    : typeof got;
+        throw new Error(tr("ui.err_contract", { got: found, want }));
+    }
+    return got;
+}
+
+/** `check_deps` must return a report object with a list of deps. */
+function validDepReport(r) {
+    return r !== null
+        && typeof r === "object"
+        && !Array.isArray(r)
+        && Array.isArray(r.deps)
+        && typeof r.ready === "boolean"
+        && typeof r.arch === "string";
+}
+
+/** `list_volumes` must return an array of objects keyed by device id. */
+function validVolumeList(rows) {
+    return Array.isArray(rows)
+        && rows.every((v) => v !== null
+            && typeof v === "object"
+            && typeof v.device_identifier === "string"
+            && typeof v.display_label === "string");
+}
+
+// ---------------------------------------------------------------------------
 // i18n — Chinese by default.
 //
 // The keys outside `ui` mirror `Labels` in `src-tauri/src/lib.rs` exactly; the
@@ -92,6 +195,10 @@ const I18N = {
             about_license: "许可证",
             about_authors: "作者",
             about_version: "版本",
+            err_timeout: "等待响应超时（{secs} 秒）",
+            err_contract: "接口返回异常（{got}），请升级到最新版本",
+            retry: "重新检测",
+            elapsed: "（已等待 {secs} 秒）",
             modal_cancel: "取消",
             modal_confirm: "确认",
         },
@@ -167,6 +274,10 @@ const I18N = {
             about_license: "License",
             about_authors: "Authors",
             about_version: "Version",
+            err_timeout: "Timed out after {secs}s",
+            err_contract: "Unexpected response ({got}); update ntfs-mac",
+            retry: "Re-check",
+            elapsed: " (waiting {secs}s)",
             modal_cancel: "Cancel",
             modal_confirm: "Confirm",
         },
@@ -199,8 +310,15 @@ function tr(key, vars) {
     if (vars === undefined) {
         return node;
     }
-    return node.replace(/\{(\w+)\}/g, (whole, name) =>
-        vars[name] === undefined ? whole : String(vars[name]));
+    return node.replace(/\{(\w+)\}/g, (whole, name) => {
+        if (vars[name] === undefined) {
+            return whole;
+        }
+        // `call()` rejects with an `Error`; `String(err)` would leak the
+        // "Error: " prefix into the toast, so unwrap it here once.
+        const value = vars[name] instanceof Error ? vars[name].message : vars[name];
+        return String(value);
+    });
 }
 
 /** Escape a value before it is placed into `innerHTML`. */
@@ -234,7 +352,7 @@ async function setLang(next) {
         return;
     }
     try {
-        await invoke("set_language", { language: next });
+        await call("set_language", { language: next });
     } catch (err) {
         toast(tr("ui.msg_err_lang", { msg: err }), "error");
         return;
@@ -268,53 +386,113 @@ function flashError(message) {
 // ---------------------------------------------------------------------------
 
 let depsReady = true;
+let depsInFlight = null;
+
+/**
+ * Live "已等待 N 秒" counter on a container element, so a slow probe is
+ * visible as progress rather than a dead spinner. Returns a stopper that must
+ * be called when the pending call settles.
+ */
+function elapsedCounter(el, baseText) {
+    el.textContent = baseText;
+    let secs = 0;
+    const handle = setInterval(() => {
+        secs += 1;
+        el.textContent = `${baseText}${tr("ui.elapsed", { secs })}`;
+    }, 1000);
+    return () => clearInterval(handle);
+}
+
+/**
+ * Show a failure plus a retry button inside `el`. Both loaders reuse this so a
+ * stalled probe is always recoverable from the UI itself.
+ */
+function showError(el, message) {
+    el.innerHTML = `<div class="row-error">
+        ${esc(message)}
+        <button class="btn btn-small btn-ghost" type="button" id="${el.id}-retry" data-i18n="ui.retry">${esc(tr("ui.retry"))}</button>
+    </div>`;
+}
 
 async function loadDeps() {
+    // Coalesce: the tray poller re-emits `ntfs-mac:refresh` on every menu
+    // change and the toolbar button fires too. Without a guard these stack
+    // into a queue of concurrent probes, each showing its own spinner — which
+    // is exactly the "永远检测中" symptom.
+    if (depsInFlight) {
+        return depsInFlight;
+    }
+
     const list = document.getElementById("deps-list");
     const badge = document.getElementById("deps-badge");
     const installBtn = document.getElementById("install-btn");
-    list.innerHTML = `<div class="empty-hint">${esc(tr("ui.loading"))}</div>`;
+    const stopTick = elapsedCounter(list, tr("ui.loading"));
+    badge.textContent = "…";
+    badge.className = "badge badge-muted";
 
-    let report;
+    depsInFlight = (async () => {
+        // One place to render the failure state, so neither a timeout nor a
+        // shape mismatch can escape as an unhandled rejection.
+        const fail = (message) => {
+            stopTick();
+            depsReady = false;
+            installBtn.hidden = false;
+            badge.textContent = tr("ui.deps_partial");
+            badge.className = "badge badge-warn";
+            showError(list, message);
+        };
+
+        let report;
+        try {
+            report = await call("check_deps");
+            // Shape check inside the try: a contract drift is reported like any
+            // other failure, never as a blank page of `undefined`.
+            expectShape(report, validDepReport, "deps / ready / arch");
+        } catch (err) {
+            fail(tr("ui.msg_err_deps", { msg: err }));
+            return;
+        }
+        stopTick();
+
+        const macos = report.macos_version
+            ? `macOS ${esc(report.macos_version)}`
+            : "macOS";
+        document.getElementById("platform-info").innerHTML =
+            `${macos} · <span class="mono">${esc(report.arch)}</span>`;
+
+        depsReady = Boolean(report.ready);
+        badge.textContent = depsReady ? tr("ready") : tr("missing");
+        badge.className = depsReady ? "badge badge-ok" : "badge badge-warn";
+        installBtn.hidden = depsReady;
+
+        const rows = report.deps.map((dep) => {
+            const mark = dep.present ? "✓" : "✕";
+            const cls = dep.present ? "dep-ok" : "dep-no";
+            const state = dep.present ? tr("ui.dep_ok") : tr("ui.dep_no");
+            const path = dep.path
+                ? `<span class="path mono">${esc(dep.path)}</span>`
+                : "";
+            const hint = !dep.present && dep.install_hint
+                ? `<div class="dep-hint">${esc(dep.install_hint)}</div>`
+                : "";
+            return `<div class="dep-row">
+                <span class="dep-mark ${cls}">${mark}</span>
+                <span class="dep-name">${esc(dep.name)}</span>
+                ${path}
+                <span class="dep-state ${cls}">${state}</span>
+                ${hint}
+            </div>`;
+        });
+        list.innerHTML = rows.length
+            ? rows.join("")
+            : `<div class="empty-hint">${esc(tr("ui.no_deps"))}</div>`;
+    })();
+
     try {
-        report = await invoke("check_deps");
-    } catch (err) {
-        list.innerHTML = `<div class="row-error">${esc(tr("ui.msg_err_deps", { msg: err }))}</div>`;
-        badge.textContent = tr("ui.deps_partial");
-        badge.className = "badge badge-warn";
-        installBtn.hidden = false;
-        depsReady = false;
-        return;
+        return await depsInFlight;
+    } finally {
+        depsInFlight = null;
     }
-
-    const macos = report.macos_version ? `macOS ${esc(report.macos_version)}` : "macOS";
-    document.getElementById("platform-info").innerHTML =
-        `${macos} · <span class="mono">${esc(report.arch)}</span>`;
-
-    depsReady = Boolean(report.ready);
-    const missing = (report.deps || []).filter((d) => !d.present);
-    badge.textContent = depsReady ? tr("ready") : tr("missing");
-    badge.className = depsReady ? "badge badge-ok" : "badge badge-warn";
-    installBtn.hidden = depsReady;
-
-    const rows = (report.deps || []).map((dep) => {
-        const mark = dep.present ? "✓" : "✕";
-        const cls = dep.present ? "dep-ok" : "dep-no";
-        const state = dep.present ? tr("ui.dep_ok") : tr("ui.dep_no");
-        const path = dep.path ? `<span class="path mono">${esc(dep.path)}</span>` : "";
-        const hint = !dep.present && dep.install_hint
-            ? `<div class="dep-hint">${esc(dep.install_hint)}</div>` : "";
-        return `<div class="dep-row">
-            <span class="dep-mark ${cls}">${mark}</span>
-            <span class="dep-name">${esc(dep.name)}</span>
-            ${path}
-            <span class="dep-state ${cls}">${state}</span>
-            ${hint}
-        </div>`;
-    });
-    list.innerHTML = rows.length
-        ? rows.join("")
-        : `<div class="empty-hint">${esc(tr("ui.no_deps"))}</div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -322,32 +500,58 @@ async function loadDeps() {
 // ---------------------------------------------------------------------------
 
 let volumes = [];
+let volumesInFlight = null;
 
 async function loadVolumes() {
+    if (volumesInFlight) {
+        return volumesInFlight;
+    }
+
     const el = document.getElementById("volumes-list");
     const count = document.getElementById("volumes-count");
+    const stopTick = elapsedCounter(el, tr("ui.vol_loading"));
+    count.textContent = "…";
+    count.className = "badge badge-muted";
 
-    let next;
+    volumesInFlight = (async () => {
+        const fail = (message) => {
+            stopTick();
+            volumes = [];
+            count.textContent = "–";
+            count.className = "badge badge-warn";
+            showError(el, message);
+        };
+
+        let next;
+        try {
+            next = await call("list_volumes");
+            expectShape(next, validVolumeList,
+                "[] of {device_identifier, display_label}");
+        } catch (err) {
+            fail(tr("ui.vol_error", { msg: err }));
+            return;
+        }
+        stopTick();
+
+        volumes = next;
+        const mounted = volumes.filter((v) => v.mounted).length;
+        count.textContent = volumes.length
+            ? tr("ui.vol_count", { n: volumes.length, m: mounted })
+            : tr("empty");
+        count.className = "badge badge-muted";
+
+        if (volumes.length === 0) {
+            el.innerHTML = `<div class="empty-hint">${esc(tr("ui.vol_empty"))}</div>`;
+            return;
+        }
+        el.innerHTML = volumes.map(volumeCard).join("");
+    })();
+
     try {
-        next = await invoke("list_volumes");
-    } catch (err) {
-        el.innerHTML = `<div class="row-error">${esc(tr("ui.vol_error", { msg: err }))}</div>`;
-        count.textContent = "–";
-        volumes = [];
-        return;
+        return await volumesInFlight;
+    } finally {
+        volumesInFlight = null;
     }
-
-    volumes = Array.isArray(next) ? next : [];
-    const mounted = volumes.filter((v) => v.mounted).length;
-    count.textContent = volumes.length
-        ? tr("ui.vol_count", { n: volumes.length, m: mounted })
-        : tr("empty");
-
-    if (volumes.length === 0) {
-        el.innerHTML = `<div class="empty-hint">${esc(tr("ui.vol_empty"))}</div>`;
-        return;
-    }
-    el.innerHTML = volumes.map(volumeCard).join("");
 }
 
 /** One volume card. Every action is guarded behind the backend validator. */
@@ -434,41 +638,41 @@ async function runAction(act, deviceId, button) {
     try {
         switch (act) {
             case "mount": {
-                const at = await invoke("mount_volume", { deviceId, readonly: false });
+                const at = await call("mount_volume", { deviceId, readonly: false });
                 toast(tr("ui.msg_mounted_at", { path: at }), "ok");
                 break;
             }
             case "mount-ro": {
-                const at = await invoke("mount_volume", { deviceId, readonly: true });
+                const at = await call("mount_volume", { deviceId, readonly: true });
                 toast(tr("ui.msg_mounted_ro", { path: at }), "ok");
                 break;
             }
             case "unmount":
-                await invoke("unmount_volume", { deviceId });
+                await call("unmount_volume", { deviceId });
                 toast(tr("ui.msg_unmounted", { id: deviceId }), "ok");
                 break;
             case "open": {
-                const at = await invoke("open_in_finder", { deviceId });
+                const at = await call("open_in_finder", { deviceId });
                 toast(tr("ui.msg_opened", { path: at }), "ok");
                 break;
             }
             case "fix":
-                await invoke("fix_volume", { deviceId, useFsck: false });
+                await call("fix_volume", { deviceId, useFsck: false });
                 toast(tr("ui.msg_fixed", { id: deviceId }), "ok");
                 break;
             case "fix-fsck":
-                await invoke("fix_volume", { deviceId, useFsck: true });
+                await call("fix_volume", { deviceId, useFsck: true });
                 toast(tr("ui.msg_fixed", { id: deviceId }), "ok");
                 break;
             case "eject": {
-                const at = await invoke("eject_volume", { deviceId });
+                const at = await call("eject_volume", { deviceId });
                 toast(tr("ui.msg_ejected", { path: at ?? deviceId }), "ok");
                 break;
             }
             default:
                 throw new Error(`unknown action ${act}`);
         }
-        await invoke("refresh_menu");
+        await call("refresh_menu");
         await loadVolumes();
         await loadDeps();
     } catch (err) {
@@ -540,13 +744,13 @@ function openFormatModal(deviceId) {
             const label = document.getElementById("format-label");
             busy(true);
             try {
-                await invoke("format_volume", {
+                await call("format_volume", {
                     deviceId,
                     label: label.value ? label.value : undefined,
                     quick: true,
                 });
                 toast(tr("ui.msg_format_ok"), "ok");
-                await invoke("refresh_menu");
+                await call("refresh_menu");
                 await loadVolumes();
             } catch (err) {
                 flashError(errText("format", err));
@@ -562,6 +766,11 @@ function openFormatModal(deviceId) {
 // ---------------------------------------------------------------------------
 
 document.getElementById("volumes-list").addEventListener("click", (ev) => {
+    // Retry after a stalled scan; handled before the action buttons.
+    if (ev.target.closest("#volumes-list-retry")) {
+        void loadVolumes();
+        return;
+    }
     const button = ev.target.closest("button[data-act]");
     if (!button) {
         return;
@@ -575,6 +784,12 @@ document.getElementById("volumes-list").addEventListener("click", (ev) => {
     void runAction(act, deviceId, button);
 });
 
+document.getElementById("deps-list").addEventListener("click", (ev) => {
+    if (ev.target.closest("#deps-list-retry")) {
+        void loadDeps();
+    }
+});
+
 // ---------------------------------------------------------------------------
 // Header / toolbar
 // ---------------------------------------------------------------------------
@@ -584,13 +799,13 @@ document.getElementById("lang-en").addEventListener("click", () => void setLang(
 
 document.getElementById("refresh-btn").addEventListener("click", async () => {
     await Promise.all([loadDeps(), loadVolumes()]);
-    await invoke("refresh_menu");
+    await call("refresh_menu");
 });
 
 document.getElementById("install-btn").addEventListener("click", async () => {
     busy(true);
     try {
-        const result = await invoke("install_dependencies");
+        const result = await call("install_dependencies");
         toast(String(result), "info", 8000);
     } catch (err) {
         flashError(tr("ui.msg_err_deps", { msg: err }));
@@ -606,7 +821,7 @@ document.getElementById("install-btn").addEventListener("click", async () => {
 async function loadAbout() {
     const el = document.getElementById("about-block");
     try {
-        const info = await invoke("app_info");
+        const info = await call("app_info");
         el.innerHTML = `<h2>${esc(tr("ui.about_title"))}</h2>
             <p class="about-lead">${esc(info.name)} · ${esc(tr("ui.about_version"))} ${esc(info.version)}</p>
             <p class="about-desc">${esc(info.description || "")}</p>

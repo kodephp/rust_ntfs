@@ -399,6 +399,12 @@ body {
     word-break: break-word;
 }
 
+/* Retry button inside a failure row: stacked below the message. */
+.row-error button {
+    margin-top: 8px;
+    color: var(--danger);
+}
+
 /* ------------------------------------------------------------------ */
 /* Modal                                                               */
 /* ------------------------------------------------------------------ */

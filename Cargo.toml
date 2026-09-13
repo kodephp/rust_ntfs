@@ -15,7 +15,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -25,7 +25,7 @@ description = "A small NTFS toolkit for macOS: mount, unmount, format, fix, copy
 
 [workspace.dependencies]
 # Internal crates.
-ntfs-mac-core = { version = "0.1.5", path = "crates/ntfs-mac-core" }
+ntfs-mac-core = { version = "0.1.6", path = "crates/ntfs-mac-core" }
 
 # CLI.
 clap = { version = "4.5", features = ["derive", "wrap_help", "color"] }
@@ -53,6 +53,10 @@ colored = "3"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-build = "2"
 tauri-plugin-dialog = "2"
+# Closing the window only hides it (the tray icon is the real host), so an old
+# instance survives a reinstall. This plugin makes a second launch focus the
+# existing window instead of starting a second process with a second icon.
+tauri-plugin-single-instance = "2"
 
 # Logging.
 tracing = "0.1"

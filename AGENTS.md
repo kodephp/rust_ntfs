@@ -217,6 +217,29 @@ cargo run -p ntfs-mac-cli -- license            # 人工查看许可证摘要
   `labels()` / `set_language` 对非 `"en"` 一律回落到中文。
 - `index.html` 必须 `lang="zh"`，静态可见文案全部为中文。
 
+### 界面 ↔ API 安全性（v0.1.6 起强制）
+
+- **禁止无界子进程**：任何 `runner::run` 必须带 `timeout: Some(...)`。
+  `RunOptions::default().timeout == None` 会走无界 `child.wait()`——UI 上一个
+  卡住的命令就等于永久转圈。只读系统探针用 `deps.rs::PROBE_TIMEOUT`（5s），
+  主窗口操作用 `CMD_TIMEOUT`（30s）。新增调用必须给上限。
+- **前端每个 `invoke` 必须走 `call()`**：`app.js` 里不允许出现裸 `invoke("...")`，
+  必须在 `CALL_TIMEOUT_MS` 里登记该命令的毫秒上限（取值需高于后端自身的子进程
+  上限，避免误伤慢盘；但必须有限）。
+- **响应必须做形状校验**：用 `expectShape()` + `validDepReport()` /
+  `validVolumeList()` 校验后端返回结构；漂移时显示「接口返回异常」而非渲染
+  一片 `undefined`。新增命令返回新结构时同步加校验。
+- **失败必须可恢复**：依赖与卷两个 loader 走 `showError()` 渲染错误 +
+  「重新检测」按钮，禁止静默吞掉错误。两个 loader 各自用
+  `depsInFlight` / `volumesInFlight` 合并 5s `ntfs-mac:refresh` 的重复触发
+  ——不加合并就会堆叠并发探针，表现为"永远检测中"。
+- **单实例**：`run()` 必须挂 `tauri_plugin_single_instance`，回调里调
+  `show_window()` 聚焦既有窗口。关窗只隐藏不退出，因此旧版本残留进程会被托盘
+  留住；没有单实例守护就会开出第二个窗口。窗口 label 固定为 `"main"`。
+- `scripts/test-frontend.sh` 共 7 项契约检查，含「无裸 invoke」「每命令有超时
+  上限」「UI 调用的命令集与 `generate_handler!` 注册的完全一致」。新增命令时
+  三处（后端 handler、前端 `call()`、`CALL_TIMEOUT_MS`）必须同时更新。
+
 ### 禁止
 
 - 前端不得新增构建步骤（无 npm / bundler），保持纯 HTML/CSS/JS。

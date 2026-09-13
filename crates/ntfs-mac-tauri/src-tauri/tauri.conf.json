@@ -10,6 +10,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "ntfs-mac — NTFS 工具箱",
         "width": 940,
         "height": 680,

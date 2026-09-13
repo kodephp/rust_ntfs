@@ -121,6 +121,25 @@ ntfs-mac 是一款 **菜单栏常驻应用**（同 [Mounty](https://mounty.app/)
   卷列表（挂载 / 只读挂载 / 修复 / 深度修复 / 格式化 / 打开 / 弹出）、关于信息。
 - **关闭窗口不退出**：点红色关闭按钮只是隐藏窗口，进程仍留在菜单栏；
   要退出请从菜单栏选「退出 ntfs-mac」。
+- **单实例**：再次启动（或旧版本残留进程还在运行时）不会开出第二个窗口，
+  而是把已有窗口带到前台。
+
+### 界面可靠性保证
+
+界面与后端的每一次通信都有截止时间，不会静默卡住：
+
+- 后端每个子进程调用都带超时（只读系统探针 5 秒，主窗口操作 30 秒）；
+- 前端每个 `invoke` 都包在 `call()` 里并登记独立的毫秒上限
+  （`app.js` 的 `CALL_TIMEOUT_MS`），超时即显示「等待响应超时（N 秒）」；
+- 探测中的面板会实时显示「已等待 N 秒」，失败时给出「重新检测」按钮，
+  两个面板各自独立、互不拖累；
+- 后端返回结构会被校验（`expectShape`），契约漂移时显示「接口返回异常」
+  而不是渲染出一页 `undefined`。
+
+`scripts/test-frontend.sh` 的 7 项契约检查会强制以上约束：不允许裸 `invoke()`、
+每个命令都必须有超时上限、窗口调用的命令集必须与后端 `generate_handler!`
+注册的完全一致。
+
 
 ### 中英文切换（默认中文）
 
@@ -341,7 +360,7 @@ ntfs-mac license --json
 输出示例：
 
 ```
-ntfs-mac 0.1.5 — Apache-2.0
+ntfs-mac 0.1.6 — Apache-2.0
 Copyright 2026 kodephp contributors
 https://www.apache.org/licenses/LICENSE-2.0
 
@@ -352,7 +371,7 @@ https://www.apache.org/licenses/LICENSE-2.0
 Bundled files
   LICENSE                  /usr/local/share/ntfs-mac/LICENSE
   NOTICE                   /usr/local/share/ntfs-mac/NOTICE
-  THIRD_PARTY_LICENSES.md  487 crates (87 CLI, 447 GUI) — embedded in this binary
+  THIRD_PARTY_LICENSES.md  525 crates (87 CLI, 488 GUI) — embedded in this binary
 ```
 
 `LICENSE` / `NOTICE` 会在多个候选目录中查找（源码树 → `/usr/local/share/ntfs-mac`
@@ -448,8 +467,8 @@ VERSION=0.2.0 ./scripts/build-macos.sh
 发布前签名与公证（绕过 Gatekeeper）：
 
 ```bash
-codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.5.pkg
-xcrun notarytool submit dist/ntfs-mac-0.1.5.pkg --wait
+codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.6.pkg
+xcrun notarytool submit dist/ntfs-mac-0.1.6.pkg --wait
 ```
 
 ## 开发

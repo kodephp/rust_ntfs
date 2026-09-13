@@ -1,6 +1,6 @@
 cask "ntfs-mac" do
-  version "0.1.5"
-  sha256 "69bb1d658c62662d4ce4720e782f8b24f1c8fb945fe06211d1ad2930b4c254d4"
+  version "0.1.6"
+  sha256 "1a6afc66dc0789adeaf4b8b764aef8533797fe7ef8848ab701b90e2f43ac1d0a"
 
   url "https://github.com/kodephp/rust_ntfs/releases/download/v#{version}/ntfs-mac-#{version}.pkg"
   name "ntfs-mac"
@@ -12,8 +12,9 @@ cask "ntfs-mac" do
     strategy :github_latest
   end
 
-  # The .pkg ships a universal binary (Apple Silicon + Intel) and installs
-  # the GUI app, the CLI and the licence artefacts in one pass.
+  # The .pkg installs the GUI app, the CLI and the licence artefacts in one
+  # pass. It is built on the release host's own architecture (arm64 today);
+  # rebuild from source on an Intel host to ship an x86_64 package.
   depends_on macos: :monterey
 
   pkg "ntfs-mac-#{version}.pkg"

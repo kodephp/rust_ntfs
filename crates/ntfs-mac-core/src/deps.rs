@@ -9,11 +9,22 @@
 
 use std::fmt;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::runner;
+
+/// Hard ceiling for one read-only system probe.
+///
+/// `sw_vers` normally answers in milliseconds, so five seconds is generous
+/// while still guaranteeing that [`report`] can never hang. Before this
+/// constant the probe ran through [`runner::RunOptions::default`], whose
+/// `timeout` is `None` — that sent `runner::run` down the unbounded
+/// `child.wait()` branch, so a wedged `launchd` turned a dependency check
+/// into an eternal spinner in the GUI.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Which FUSE driver the user should install on macOS.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,9 +230,16 @@ pub fn report() -> Result<DepReport> {
 }
 
 /// Small helper to capture the stdout of a read-only system probe.
+///
+/// Always bounded: see [`PROBE_TIMEOUT`]. A timeout degrades to `None`
+/// (`macos_version` simply stays unset) rather than blocking the caller.
 fn shell_value(cmd: &str, args: &[&str]) -> Option<String> {
     use crate::runner::{RunOptions, run};
-    match run(cmd, args, &RunOptions::default()) {
+    let opts = RunOptions {
+        timeout: Some(PROBE_TIMEOUT),
+        ..Default::default()
+    };
+    match run(cmd, args, &opts) {
         Ok(out) if out.success() => Some(out.stdout.trim().to_string()),
         _ => None,
     }
@@ -277,5 +295,26 @@ mod tests {
         let text = report.to_string();
         assert!(text.contains("ntfs-3g"));
         assert!(text.contains("aarch64"));
+    }
+
+    #[test]
+    fn probe_timeout_is_bounded_for_the_ui() {
+        // Regression guard for the "永远检测中" defect: a probe that blocks
+        // this long would be unnoticeable to a user, but anything above a
+        // few seconds turns the window into a dead spinner.
+        assert!(
+            PROBE_TIMEOUT <= Duration::from_secs(10),
+            "a probe longer than 10s will look hung in the GUI"
+        );
+    }
+
+    #[test]
+    fn shell_value_degrades_gracefully() {
+        // A missing binary must return `None`, never panic and never block:
+        // this is the failure mode the GUI depends on to keep rendering.
+        assert_eq!(
+            shell_value("definitely-not-a-real-binary-ntfs-mac", &[]),
+            None
+        );
     }
 }
