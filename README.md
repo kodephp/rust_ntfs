@@ -59,11 +59,18 @@ brew install ntfs-3g
 
 **方式二：Homebrew Cask**
 
-cask 定义在仓库的 [`Casks/ntfs-mac.rb`](Casks/ntfs-mac.rb)，同样通过 GitHub Releases 上的 `.pkg` 安装：
+cask 定义在仓库的 [`Casks/ntfs-mac.rb`](Casks/ntfs-mac.rb)，通过 GitHub Releases 上的 `.pkg` 安装。
+本仓库自身即 tap；Homebrew 6 起第三方 tap 需显式信任（tap 创建阶段存在先信任后校验的死循环，
+首次 tap 需临时关闭该校验）：
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/kodephp/rust_ntfs/main/Casks/ntfs-mac.rb
+HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew tap kodephp/rust_ntfs https://github.com/kodephp/rust_ntfs.git
+brew trust kodephp/rust_ntfs
+brew install --cask kodephp/rust_ntfs/ntfs-mac
 ```
+
+> 已在 Homebrew 6.0.22 实测：`brew style --cask` 零违规，`brew fetch --cask` 可下载
+> Release 附件并通过 sha256 校验。后续若发布独立的 `homebrew-tap` 仓库，可简化为两条命令。
 
 卸载：
 
@@ -521,10 +528,13 @@ GitHub Actions 自动化工作流（`.github/workflows/ci.yml`）：
 ### Homebrew Cask
 
 cask 定义在 `Casks/ntfs-mac.rb`，安装 GitHub Releases 上的 `.pkg`
-（GUI + CLI + 许可证文档一体安装），`brew style --cask` 零违规。
+（GUI + CLI + 许可证文档一体安装）。已验证：`brew style --cask` 零违规、
+`brew fetch --cask` 下载并通过 sha256 校验。
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/kodephp/rust_ntfs/main/Casks/ntfs-mac.rb
+HOMEBREW_NO_REQUIRE_TAP_TRUST=1 brew tap kodephp/rust_ntfs https://github.com/kodephp/rust_ntfs.git
+brew trust kodephp/rust_ntfs
+brew install --cask kodephp/rust_ntfs/ntfs-mac
 brew uninstall --cask ntfs-mac
 ```
 
