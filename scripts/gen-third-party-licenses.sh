@@ -32,8 +32,10 @@ if [ -z "$py" ]; then
   exit 1
 fi
 
-tmp="$(mktemp -t ntfs-mac-third-party)"
-meta="$(mktemp -t ntfs-mac-metadata)"
+# `mktemp -t prefix` is BSD-only: GNU mktemp (Ubuntu CI) rejects a template
+# without X placeholders. Give both platforms an explicit template instead.
+tmp="$(mktemp "${TMPDIR:-/tmp}/ntfs-mac-third-party.XXXXXX")"
+meta="$(mktemp "${TMPDIR:-/tmp}/ntfs-mac-metadata.XXXXXX")"
 trap 'rm -f "$tmp" "$meta"' EXIT
 
 # Derive the inventory from the pinned versions in Cargo.lock. `--locked`
