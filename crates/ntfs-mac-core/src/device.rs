@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! NTFS volume discovery via `diskutil list -plist` + `mount`.
 //!
 //! `diskutil list -plist` emits a nested plist document whose top-level

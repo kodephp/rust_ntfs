@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Dependency discovery: ntfs-3g, macFUSE / FUSE-T, diskutil, hdiutil,
 //! rsync, mkntfs/newfs_ntfs, ntfsfix, fsck_ntfs.
 //!

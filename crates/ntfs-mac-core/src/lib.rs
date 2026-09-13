@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! ntfs-mac core.
 //!
 //! Subprocess wrappers around `ntfs-3g`, `diskutil`, `hdiutil`,
@@ -27,6 +30,7 @@
 //!   format   mkntfs / newfs_ntfs (destructive, gated)
 //!   fix      ntfsfix / fsck_ntfs
 //!   copy     rsync-based copy with progress
+//!   license  Licence metadata + embedded attribution inventory
 //! ```
 
 pub mod config;
@@ -38,6 +42,7 @@ pub mod error;
 pub mod fix;
 pub mod format;
 pub mod hardening;
+pub mod license;
 pub mod mount;
 pub mod runner;
 
@@ -47,6 +52,9 @@ pub use error::{ConfigError, Error, ExitCode, Result};
 pub use hardening::{
     install_panic_hook, install_signal_handlers, is_stdin_tty, is_stdout_tty, should_exit,
     validate_device_id, validate_label, validate_mount_point,
+};
+pub use license::{
+    LicenseSummary, ThirdPartyCounts, display_path, license_file, notice_file, third_party_counts,
 };
 pub use runner::{RunOptions, read_line_interactive, run_expect_success, which};
 

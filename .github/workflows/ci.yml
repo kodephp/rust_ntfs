@@ -23,7 +23,7 @@ jobs:
     name: Lint (macOS)
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -31,7 +31,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -56,13 +56,21 @@ jobs:
     runs-on: macos-14
     needs: lint-macos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # Required by scripts/build-macos.sh step [1/5]. Without the Tauri
+      # CLI the GUI bundle cannot be produced and the job fails with
+      # `error: no such command: tauri`.
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli
+
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -72,16 +80,17 @@ jobs:
 
       - name: Build
         run: |
-          chmod +x scripts/build-macos.sh scripts/install.sh scripts/pkg-scripts/*.sh
+          chmod +x scripts/build-macos.sh scripts/install.sh scripts/gen-third-party-licenses.sh scripts/pkg-scripts/*.sh
           ./scripts/build-macos.sh
 
       - name: Verify pkg
         run: |
           ls -lh dist/ntfs-mac-*.pkg
+          pkgutil --payload-files dist/ntfs-mac-*.pkg
           pkgutil --check-signature dist/ntfs-mac-*.pkg || true
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ntfs-mac-macos
           path: dist/ntfs-mac-*.pkg
@@ -101,34 +110,42 @@ jobs:
     name: Cargo audit
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install cargo-audit
-        uses: actions-rs/cargo@v1
+        uses: taiki-e/install-action@v2
         with:
-          command: install
-          args: cargo-audit --locked
+          tool: cargo-audit
 
       - name: Audit
         run: cargo audit
 
   # ------------------------------------------------------------------
-  # Dependency license check.
+  # Dependency licence policy + generated attribution inventory.
   # ------------------------------------------------------------------
   licenses:
     name: License check
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-deny
-        uses: actions-rs/cargo@v1
+        uses: taiki-e/install-action@v2
         with:
-          command: install
-          args: cargo-deny --locked
+          tool: cargo-deny
 
+      # `deny.toml` MUST keep this exact name: cargo-deny does not read
+      # `Cargo.deny.toml`, and silently falls back to a default policy that
+      # rejects every licence (including MIT).
+      # `licenses` is the policy gate; `bans` and `sources` are cheap and
+      # deterministic. Advisories are owned by the `cargo audit` job above
+      # so a new entry in the advisory database cannot turn this job red
+      # without a code change.
       - name: Deny
-        run: cargo deny check licenses
+        run: cargo deny check licenses bans sources
+
+      - name: THIRD_PARTY_LICENSES.md is up to date
+        run: ./scripts/gen-third-party-licenses.sh --check

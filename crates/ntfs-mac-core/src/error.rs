@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Typed errors + POSIX-style exit codes used by the CLI/GUI layer.
 
 use std::path::PathBuf;

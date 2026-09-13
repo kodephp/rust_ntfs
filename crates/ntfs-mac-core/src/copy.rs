@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! File copy between macOS and an NTFS volume. Uses `rsync` when
 //! available for progress reporting + resume semantics; falls back
 //! to `cp -a` when rsync is not installed.

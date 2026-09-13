@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! NTFS repair. `ntfsfix -d` unmounts the volume, clears the dirty
 //! flag and runs a light chkdsk-like pass. `fsck_ntfs` is a heavier
 //! alternative.

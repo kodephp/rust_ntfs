@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Production hardening: panic hook, signal handling, input validation, TTY detection.
 
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Mount / unmount NTFS volumes.
 //!
 //! Prefer `diskutil mount <disk>` because it transparently routes

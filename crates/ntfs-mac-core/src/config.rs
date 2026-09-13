@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Persistent configuration at `~/.config/ntfs-mac/config.toml`.
 //!
 //! Kept intentionally tiny — 5 fields, no schema versioning. Add

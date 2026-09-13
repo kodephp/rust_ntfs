@@ -1,13 +1,24 @@
 # Cargo
 /target
 **/target/
-Cargo.lock
 
-# Tauri / frontend
-crates/ntfs-mac-tauri/src/
-crates/ntfs-mac-tauri/gen/
-crates/ntfs-mac-tauri/dist/
-crates/ntfs-mac-tauri/src-tauri/target/
+# NOTE: Cargo.lock is committed on purpose. This workspace produces
+# executables (the `ntfs-mac` CLI and the `ntfs-mac.app` GUI), and Cargo's
+# guidance is to commit the lock file for anything that ships a binary.
+# The release build, `cargo audit`, `cargo deny` and the generated
+# THIRD_PARTY_LICENSES.md inventory are all derived from it, so leaving it
+# out makes those steps unreproducible. Published library crates ignore it
+# regardless, so this does not affect crates.io consumers.
+
+# Tauri
+#
+# NOTE: `crates/ntfs-mac-tauri/src/` is the hand-written GUI frontend
+# (`index.html`, `app.js`, `styles.css`, `assets/`) and is what
+# `build.frontendDist: "../src"` in tauri.conf.json points at. It used to
+# be ignored here, which meant the repository shipped without the GUI
+# source: neither a fresh clone nor CI could build ntfs-mac.app.
+# Nothing extra is ignored for Tauri — `target/` is covered above, and
+# `crates/ntfs-mac-tauri/dist/` by the `dist/` rule below.
 
 # Node
 node_modules/

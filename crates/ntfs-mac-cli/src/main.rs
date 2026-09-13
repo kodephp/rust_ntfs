@@ -1,19 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use colored::Colorize;
 use ntfs_mac_core::{
-    Config, DestructiveToken, copy, daemon, default_config_path, deps, device, fix, format, mount,
-    read_line_interactive, validate_device_id, validate_mount_point,
+    Config, DestructiveToken, copy, daemon, default_config_path, deps, device, fix, format,
+    license, mount, read_line_interactive, validate_device_id, validate_mount_point,
 };
+
+/// Shown by `--version` (the short `-V` keeps just the number). Built with
+/// `concat!` so it stays a `&'static str`; it deliberately does not repeat
+/// the licence text, which lives in `ntfs-mac license`.
+const LONG_VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    "\nRun `ntfs-mac license` for licence, NOTICE and third-party attribution details."
+);
 
 #[derive(Parser, Debug)]
 #[command(
     name = "ntfs-mac",
     version,
+    long_version = LONG_VERSION,
     about = "NTFS toolkit for macOS",
+    after_help = "Run `ntfs-mac license` for licence details.\nShell completions: `ntfs-mac completions <shell>`.",
     propagate_version = true
 )]
 struct Cli {
@@ -111,6 +125,20 @@ enum Command {
         /// Reveal the QR code file in Finder
         #[arg(long)]
         reveal: bool,
+    },
+    /// Show licence, NOTICE and third-party attribution details
+    License {
+        /// Print the complete Apache-2.0 licence text
+        #[arg(long)]
+        full: bool,
+        /// Print the embedded third-party crate inventory
+        #[arg(long)]
+        third_party: bool,
+    },
+    /// Generate a shell completion script on stdout
+    Completions {
+        /// Shell to generate completions for
+        shell: Shell,
     },
 }
 
@@ -267,7 +295,129 @@ fn run(cli: &Cli) -> Result<()> {
         } => cmd_copy(cli, source, destination, *delete, *dry_run),
         Command::Config { command } => cmd_config(cli, &cfg, command),
         Command::Sponsor { reveal } => cmd_sponsor(cli, *reveal),
+        Command::License { full, third_party } => cmd_license(cli, *full, *third_party),
+        Command::Completions { shell } => cmd_completions(*shell),
     }
+}
+
+/// `ntfs-mac license` — licence summary, full text, or crate inventory.
+///
+/// Everything is resolved from the binary plus [`license`]'s on-disk
+/// probes, so the command keeps working when the tool is installed rather
+/// than run from a checkout.
+fn cmd_license(cli: &Cli, full: bool, third_party: bool) -> Result<()> {
+    if full {
+        return cmd_license_full(cli);
+    }
+
+    if third_party {
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "source": "THIRD_PARTY_LICENSES.md",
+                    "embedded": true,
+                    "counts": license::third_party_counts(),
+                }))?
+            );
+        } else {
+            print!("{}", license::THIRD_PARTY_INVENTORY);
+        }
+        return Ok(());
+    }
+
+    let summary = license::summary();
+
+    if cli.json {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+        return Ok(());
+    }
+
+    println!(
+        "{} {} — {}",
+        summary.project.bold(),
+        summary.version,
+        summary.spdx.green().bold()
+    );
+    println!("{}", summary.copyright);
+    println!("{}", summary.license_url);
+    println!();
+
+    for (kind, text) in license::APACHE_CLAUSES {
+        println!("  {:<12} {}", kind.bold(), text);
+    }
+    println!();
+
+    println!("{}", "Bundled files".bold());
+    print_resource("LICENSE", summary.license_file.as_deref());
+    print_resource("NOTICE", summary.notice_file.as_deref());
+    match summary.third_party {
+        Some(counts) => println!(
+            "  {:<24} {} crates ({} CLI, {} GUI) — embedded in this binary",
+            "THIRD_PARTY_LICENSES.md", counts.total, counts.cli, counts.gui
+        ),
+        None => println!(
+            "  {:<24} embedded in this binary",
+            "THIRD_PARTY_LICENSES.md"
+        ),
+    }
+    println!();
+    println!(
+        "Use {} for the complete licence text, {} for the crate inventory.",
+        "--full".cyan(),
+        "--third-party".cyan()
+    );
+
+    Ok(())
+}
+
+fn print_resource(label: &str, found: Option<&str>) {
+    // Both files are installed next to each other; a miss usually means the
+    // binary was copied out of its install layout.
+    match found {
+        Some(path) => println!("  {label:<24} {path}"),
+        None => println!("  {label:<24} {}", "not found on disk".yellow()),
+    }
+}
+
+fn cmd_license_full(cli: &Cli) -> Result<()> {
+    let path = license::license_file().ok_or_else(|| {
+        anyhow::anyhow!(
+            "LICENSE not found on disk — the canonical text is at {}",
+            license::LICENSE_URL
+        )
+    })?;
+
+    let text = std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "spdx": license::SPDX_ID,
+                "path": license::display_path(&path),
+                "text": text,
+            }))?
+        );
+    } else {
+        print!("{text}");
+        if !text.ends_with('\n') {
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// `ntfs-mac completions <shell>` — write a completion script to stdout.
+///
+/// stdout only, so `ntfs-mac completions zsh > _ntfs-mac` works.
+fn cmd_completions(shell: Shell) -> Result<()> {
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+    Ok(())
 }
 
 fn cmd_doctor(cli: &Cli, _cfg: &Config) -> Result<()> {

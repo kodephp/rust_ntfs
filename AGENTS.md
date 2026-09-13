@@ -13,7 +13,7 @@ macOS NTFS 工具集——解决 macOS 原生只读 NTFS 的问题。
 
 ```
 crates/
-  ntfs-mac-core    核心库（subprocess 封装、plist 解析、配置、daemon）
+  ntfs-mac-core    核心库（subprocess 封装、plist 解析、配置、daemon、license 元数据）
   ntfs-mac-cli     CLI（clap 子命令）
   ntfs-mac-tauri   GUI（Tauri v2 + Vanilla HTML/JS）
 ```
@@ -21,6 +21,41 @@ crates/
 - **core** 不依赖 tauri 或 clap，保持纯净
 - **cli** 和 **tauri** 都依赖 core，不互相依赖
 - workspace `default-members` 排除 tauri 以加速迭代
+
+## 许可证与归属（Apache-2.0）
+
+本项目以 Apache-2.0 分发，配套产物必须保持同步：
+
+| 文件 | 位置 | 维护方式 |
+|------|------|----------|
+| `LICENSE` | 仓库根 | 手工，Apache-2.0 原文 |
+| `NOTICE` | 仓库根 | 手工；版权 + 第三方归属。Apache-2.0 §4(d) 要求再分发时保留 |
+| `THIRD_PARTY_LICENSES.md` | 仓库根 **与** `crates/ntfs-mac-core/` | **生成物**，由 `scripts/gen-third-party-licenses.sh` 从 `Cargo.lock` 生成 |
+| `deny.toml` | 仓库根 | 手工；许可证策略（见下） |
+
+要点：
+
+- 所有 `.rs` 文件首行带 `// SPDX-License-Identifier: Apache-2.0` + 版权行。
+- 两份 `THIRD_PARTY_LICENSES.md` 必须一致：根目录供人阅读，core 目录内那份由
+  `include_str!` 编译进二进制，所以必须位于 crate 包内（否则 `cargo publish` 会
+  因跨包路径而失败）。生成脚本一次写两份，避免漂移。
+- 生成脚本对同名不同版本的 crate 按 `(name, version)` 排序，保证输出确定；
+  `--check` 比较时会忽略 `- Generated:` 日期行，因此可以每天跑。
+- `cargo publish` 的 `license` 字段来自 `Cargo.toml`；`license::SPDX_ID` 有单元
+  测试与 `CARGO_PKG_LICENSE` 对齐。
+
+### deny.toml 策略
+
+- 所有许可证**默认拒绝**，仅 `allow` 内逐项放行（cargo-deny ≥ 0.18 移除了
+  `allow-osi-fsf-free` / `deny` / `copyleft` / `default`）。
+- MPL-2.0（`colored`、`option-ext`、`cssparser`、`selectors` 等）**不进全局白名单**，
+  而是通过具名 `[[licenses.exceptions]]` 单独放行：MPL-2.0 是文件级弱 copyleft，
+  可以随 Apache-2.0 作品分发，但引入新的 MPL crate 时应当重新评估，所以让检查失败。
+- `[advisories] unmaintained = "workspace"`：只对**直接依赖**里的停维护 crate 报警。
+  Tauri 传递依赖里的 `unic-*`、`proc-macro-error` 无升级路径，逐条 ignore 会变成
+  六条需要人工维护的豁免；`cargo audit` 仍覆盖整图。
+- **不要**把文件改名成 `Cargo.deny.toml`——cargo-deny 只认 `deny.toml` /
+  `.deny.toml`，改名等于静默关闭所有许可证检查。
 
 ## 技术栈约束
 
@@ -97,6 +132,12 @@ cd crates/ntfs-mac-tauri/src-tauri && cargo tauri dev
 
 # GUI 构建 .app
 cd crates/ntfs-mac-tauri/src-tauri && cargo tauri build
+
+# 许可证 / 第三方归属
+cargo deny check                       # deny.toml 策略（licenses/bans/sources/advisories）
+./scripts/gen-third-party-licenses.sh           # 重新生成 THIRD_PARTY_LICENSES.md
+./scripts/gen-third-party-licenses.sh --check   # 校验是否过期
+cargo run -p ntfs-mac-cli -- license            # 人工查看许可证摘要
 ```
 
 ## 发布流程
@@ -228,16 +269,39 @@ productbuild 静默丢弃没有 `<choices-outline>` + `<choice>` + `<pkg-ref>` �
 
 替代方案：`productbuild --synthesize --package <component.pkg> <out.xml>` 自动生成基础 XML，再手动注入 `<welcome>` `<readme>` `<scripts>` `<title>`。
 
-**陷阱 3：pkgbuild 遇到 .app 会"推断"为组件**
+**陷阱 3：pkgbuild 不会把 `.app` 自动搬到 `/Applications`**
 
-payload 中含 `.app` 时，pkgbuild 自动把 `.app` 安装到 `/Applications`，其他文件安装到 `/`。这是想要的行为。
+曾经这里写的是"payload 中含 `.app` 时 pkgbuild 会自动把 `.app` 安装到 `/Applications`"。
+**这是错的**，并直接导致了 0.1.0–0.1.2 的载荷把 `ntfs-mac.app`、`LICENSE`、`README.md`
+全部装进文件系统根目录。实测（`pkgutil --payload-files dist/ntfs-mac-0.1.2.pkg`）：
+
+```
+./LICENSE
+./README.md
+./ntfs-mac-cli
+./ntfs-mac.app/Contents/...
+./scripts/install.sh
+```
+
+`pkgbuild --root <dir>` 的行为是：**把 `<dir>` 当作文件系统根目录**，内部结构原样保留，
+`--install-location` 默认 `/`。所以要装到哪里，就必须先在 payload 里搭出对应目录：
+
+```
+dist/pkg-payload/
+  Applications/ntfs-mac.app
+  usr/local/bin/ntfs-mac
+  usr/local/share/ntfs-mac/{LICENSE,NOTICE,THIRD_PARTY_LICENSES.md,README.md,install.sh}
+```
+
+`build-macos.sh` 在打包后会校验 `pkgutil --payload-files`：既检查必需路径存在，
+也检查 `./LICENSE`、`./ntfs-mac.app` 之类的路径**不**存在，防止回归。
 
 ### 验证
 
 ```bash
-pkgutil --payload-files dist/ntfs-mac-0.1.0.pkg  # 列出 payload 文件
-xar -tf dist/ntfs-mac-0.1.0.pkg | head            # 查看顶层结构
-pkgutil --check-signature dist/ntfs-mac-0.1.0.pkg  # 签名检查（未签名会退出码 1）
+pkgutil --payload-files dist/ntfs-mac-0.1.3.pkg    # 只应出现 Applications/ 与 usr/local/
+xar -tf dist/ntfs-mac-0.1.3.pkg | head             # 查看顶层结构
+pkgutil --check-signature dist/ntfs-mac-0.1.3.pkg  # 签名检查（未签名会退出码 1）
 ```
 
 ## 发布检查清单（Release Checklist）
@@ -247,12 +311,20 @@ pkgutil --check-signature dist/ntfs-mac-0.1.0.pkg  # 签名检查（未签名会
 ### 1. 代码质量门
 
 ```bash
-cargo fmt --all --check              # 格式化
-cargo clippy --all                   # Lint（CLI 必须 0 警告）
-cargo test --workspace               # 全部测试通过
-cargo audit                          # 安全检查
-cargo deny check licenses            # 许可证合规
+cargo fmt --all --check                        # 格式化
+cargo clippy --workspace --all-targets         # Lint（必须 0 警告）
+cargo test --workspace                         # 全部测试通过（当前 71）
+cargo audit                                    # 安全检查
+cargo deny check                               # 许可证 / bans / sources / advisories
+./scripts/gen-third-party-licenses.sh --check  # 第三方清单未过期
 ```
+
+> `cargo deny` 读取仓库根的 **`deny.toml`**。文件名不能写成 `Cargo.deny.toml`：
+> cargo-deny 不认这个名字，会打印 `unable to find a config path, falling back to
+> default config` 并用默认策略（拒绝一切许可证）判失败。
+>
+> cargo-deny ≥ 0.18 已移除 `allow-osi-fsf-free` / `deny` / `copyleft` / `default`，
+> 所有许可证必须在 `allow` 中逐项列出。
 
 ### 2. 构建
 
@@ -260,20 +332,29 @@ cargo deny check licenses            # 许可证合规
 ./scripts/build-macos.sh             # 产出 dist/ntfs-mac-<version>.pkg
 ```
 
+> 载荷根目录即文件系统根目录，`build-macos.sh` 会把文件放进 `Applications/`、
+> `usr/local/bin/`、`usr/local/share/ntfs-mac/`。脚本末尾会校验载荷路径，任何
+> 落到 `/` 的文件都会让构建失败。
+
 ### 3. 验证安装包
 
 ```bash
-pkgutil --payload-files dist/ntfs-mac-*.pkg    # 确认 payload 内容
+pkgutil --payload-files dist/ntfs-mac-*.pkg    # 必须只出现 Applications/ 与 usr/local/
 pkgutil --check-signature dist/ntfs-mac-*.pkg   # 签名检查（未签名返回码 1）
 ```
 
 ### 4. 版本号
 
+版本号需同步以下位置（`Cargo.lock` 由 cargo 自动更新）：
+
 ```bash
-# 更新 Cargo.toml workspace.package.version
-# 更新 CHANGELOG.md
-# 更新 Formula/ntfs-mac.rb 中的 version 和 sha256
+# Cargo.toml        → [workspace.package] version
+# Cargo.toml        → [workspace.dependencies] ntfs-mac-core 的 version
+# scripts/build-macos.sh → VERSION 默认值
+# Casks/ntfs-mac.rb      → version 与 sha256（.pkg 生成后回填）
 ```
+
+发布说明写在 GitHub Release 正文中，仓库内不再维护单独的 CHANGELOG。
 
 ### 5. 签名 + 公证（发布用）
 
@@ -296,9 +377,18 @@ git push origin main --tags
 
 在 GitHub 上创建 Release，附上 `dist/ntfs-mac-<version>.pkg`。
 
-### 8. Homebrew
+### 8. Homebrew Cask
 
 ```bash
-brew tap kodephp/ntfs-mac
-brew update-code-formula ntfs-mac
+# 回填 sha256 后校验（cask 需在 tap 内才能被 brew 识别，本地验证可用临时 tap）
+shasum -a 256 dist/ntfs-mac-<version>.pkg
+TAP="$(brew --repository)/Library/Taps/kodephp/homebrew-style-tmp"
+mkdir -p "$TAP/Casks" && cp Casks/ntfs-mac.rb "$TAP/Casks/"
+git -C "$TAP" init -q . && git -C "$TAP" add Casks/ntfs-mac.rb
+brew style --cask kodephp/style-tmp/ntfs-mac
+brew info   --cask kodephp/style-tmp/ntfs-mac   # 解析校验
+rm -rf "$TAP" && rmdir "$(brew --repository)/Library/Taps/kodephp"
 ```
+
+cask 通过 `pkg` stanza 安装 Releases 上的 `.pkg`，
+`uninstall`/`zap` 以 `pkgutil: "com.kodephp.ntfs-mac"` 精确注销。

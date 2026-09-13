@@ -1,6 +1,5 @@
 {
   "productName": "ntfs-mac",
-  "version": "0.1.0",
   "identifier": "com.kodephp.ntfs-mac",
   "build": {
     "frontendDist": "../src",
@@ -29,6 +28,9 @@
     "icon": [
       "icons/icon.png"
     ],
+    "resources": {
+      "../src/assets/sponsor-qr.svg": "assets/sponsor-qr.svg"
+    },
     "macOS": {
       "minimumSystemVersion": "12.0",
       "entitlements": null

@@ -51,27 +51,45 @@ brew install ntfs-3g
 
 ## 安装
 
-**方式一：Homebrew（推荐）**
+**方式一：macOS 安装包（.pkg，推荐）**
+
+从 [GitHub Releases](https://github.com/kodephp/rust_ntfs/releases) 下载 `ntfs-mac-<version>.pkg`，双击安装。
+一次安装 GUI 应用（`/Applications/ntfs-mac.app`）、CLI（`/usr/local/bin/ntfs-mac`）
+以及许可证与归属文档（`/usr/local/share/ntfs-mac/`）。
+
+**方式二：Homebrew Cask**
+
+cask 定义在仓库的 [`Casks/ntfs-mac.rb`](Casks/ntfs-mac.rb)，同样通过 GitHub Releases 上的 `.pkg` 安装：
 
 ```bash
-brew tap kodephp/ntfs-mac
-brew install ntfs-mac
+brew install --cask https://raw.githubusercontent.com/kodephp/rust_ntfs/main/Casks/ntfs-mac.rb
 ```
 
-**方式二：macOS 安装包（.pkg）**
+卸载：
 
-从 GitHub Releases 下载 `ntfs-mac-<version>.pkg`，双击安装。
+```bash
+brew uninstall --cask ntfs-mac
+```
 
-**方式三：从源码构建**
+**方式三：cargo install（仅 CLI）**
+
+```bash
+cargo install ntfs-mac-cli
+```
+
+**方式四：从源码构建**
 
 见下节。
+
+> **注意**：无论哪种方式，读写 NTFS 都需要 FUSE 驱动（`ntfs-3g` + macFUSE/FUSE-T）。
+> 安装方法见上节，安装后需在 **系统设置 → 隐私与安全性** 中批准。
 
 ## 从源码构建
 
 ```bash
 # 克隆
-git clone https://github.com/kodephp/ntfs-mac
-cd ntfs-mac
+git clone https://github.com/kodephp/rust_ntfs
+cd rust_ntfs
 
 # CLI（默认 workspace 成员，快速）
 cargo build --release -p ntfs-mac-cli
@@ -288,6 +306,56 @@ ntfs-mac sponsor --json
 
 打包后二维码文件会随 `.app` 一起分发（位于 `.app/Contents/Resources/assets/`），GUI 窗口底部"Support This Project"卡片和 CLI `sponsor` 命令均可访问。
 
+### `license` — 许可证与第三方归属
+
+查看本项目许可证、`NOTICE` 与静态链接的第三方组件清单。所有内容都来自二进制本身
+（第三方清单在编译期内嵌），因此离线或从任意位置运行都可用。
+
+```bash
+# 许可证摘要（SPDX、版权、Apache-2.0 权利义务概要、文件位置）
+ntfs-mac license
+
+# 完整 Apache-2.0 文本（从安装目录或源码树读取 LICENSE）
+ntfs-mac license --full
+
+# 内嵌的第三方 crate 清单（约 490 个 crate，标注 CLI / GUI 归属）
+ntfs-mac license --third-party
+
+# JSON 输出
+ntfs-mac license --json
+```
+
+输出示例：
+
+```
+ntfs-mac 0.1.3 — Apache-2.0
+Copyright 2026 kodephp contributors
+https://www.apache.org/licenses/LICENSE-2.0
+
+  permissions  commercial use, modification, distribution, patent use, private use
+  conditions   license and copyright notice, state changes
+  limitations  liability, trademark use, warranty
+
+Bundled files
+  LICENSE                  /usr/local/share/ntfs-mac/LICENSE
+  NOTICE                   /usr/local/share/ntfs-mac/NOTICE
+  THIRD_PARTY_LICENSES.md  487 crates (87 CLI, 447 GUI) — embedded in this binary
+```
+
+`LICENSE` / `NOTICE` 会在多个候选目录中查找（源码树 → `/usr/local/share/ntfs-mac`
+→ Homebrew `share` → `.app/Contents/Resources`），全部找不到时才提示失败；第三方
+清单始终可用。
+
+### `completions` — Shell 补全
+
+生成补全脚本并写入 stdout：
+
+```bash
+ntfs-mac completions zsh  > ~/.zfunc/_ntfs-mac
+ntfs-mac completions bash > /usr/local/etc/bash_completion.d/ntfs-mac
+ntfs-mac completions fish > ~/.config/fish/completions/ntfs-mac.fish
+```
+
 ## 配置文件
 
 位置：`~/.config/ntfs-mac/config.toml`（遵循 XDG 规范）
@@ -337,17 +405,26 @@ chmod +x scripts/build-macos.sh
 
 | 内容 | 安装位置 |
 |------|----------|
-| `ntfs-mac.app` (GUI) | `/Applications/` |
-| `ntfs-mac` (CLI) | `/usr/local/bin/`（postinstall 建软链） |
-| `LICENSE` (Apache-2.0) | `/` |
-| `README.md` | `/` |
-| `scripts/install.sh` | `/scripts/` |
+| `ntfs-mac.app` (GUI) | `/Applications/ntfs-mac.app` |
+| `ntfs-mac` (CLI) | `/usr/local/bin/ntfs-mac` |
+| `LICENSE` (Apache-2.0 全文) | `/usr/local/share/ntfs-mac/LICENSE` |
+| `NOTICE` (版权与第三方归属) | `/usr/local/share/ntfs-mac/NOTICE` |
+| `THIRD_PARTY_LICENSES.md` | `/usr/local/share/ntfs-mac/THIRD_PARTY_LICENSES.md` |
+| `README.md` | `/usr/local/share/ntfs-mac/README.md` |
+| `install.sh` | `/usr/local/share/ntfs-mac/install.sh` |
+
+> 载荷根目录即文件系统根目录，因此构建脚本会先把文件放进 `Applications/`、
+> `usr/local/bin/`、`usr/local/share/ntfs-mac/` 再打包。构建结束时脚本会校验载荷
+> 路径，若 `LICENSE` 之类的文件落到 `/` 会直接失败。
+
+`/usr/local/share/ntfs-mac/` 正是 `ntfs-mac license --full` 查找许可证的目录之一，
+所以安装后该命令可以直接读出完整文本。
 
 安装器还带：
 - **welcome.html** — 安装前介绍
 - **readme.html** — 安装后使用指引
 - **preinstall.sh** — macOS 版本检查（要求 ≥ 12.0）
-- **postinstall.sh** — CLI 软链、install.sh 权限
+- **postinstall.sh** — CLI 与许可证文件权限修正；升级时清理旧版残留在 `/` 的 app bundle
 
 指定版本号：
 
@@ -358,8 +435,8 @@ VERSION=0.2.0 ./scripts/build-macos.sh
 发布前签名与公证（绕过 Gatekeeper）：
 
 ```bash
-codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.0.pkg
-xcrun notarytool submit dist/ntfs-mac-0.1.0.pkg --wait
+codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.3.pkg
+xcrun notarytool submit dist/ntfs-mac-0.1.3.pkg --wait
 ```
 
 ## 开发
@@ -433,27 +510,36 @@ GitHub Actions 自动化工作流（`.github/workflows/ci.yml`）：
 | Job | 运行环境 | 内容 |
 |-----|----------|------|
 | `lint-macos` | macOS 14 | `cargo fmt --check` + `cargo clippy` + `cargo test` |
-| `build-macos` | macOS 14 | `cargo build --release` + `build-macos.sh` + 上传 `.pkg` artifact |
+| `build-macos` | macOS 14 | 安装 Tauri CLI + `build-macos.sh` + 上传 `.pkg` artifact |
 | `audit` | Ubuntu 22.04 | `cargo audit`（已知 CVE 检查） |
-| `licenses` | Ubuntu 22.04 | `cargo deny check licenses`（许可证合规） |
+| `licenses` | Ubuntu 22.04 | `cargo deny check licenses bans sources` + 校验 `THIRD_PARTY_LICENSES.md` 未过期 |
 
-### Homebrew Tap
+> `licenses` Job 依赖仓库根的 `deny.toml`。文件名不能改：cargo-deny 只识别
+> `deny.toml` / `.deny.toml`，写成 `Cargo.deny.toml` 会被静默忽略并回退到默认策略
+> （默认策略拒绝一切许可证，连 MIT 都会被判失败）。
+
+### Homebrew Cask
+
+cask 定义在 `Casks/ntfs-mac.rb`，安装 GitHub Releases 上的 `.pkg`
+（GUI + CLI + 许可证文档一体安装），`brew style --cask` 零违规。
 
 ```bash
-brew tap kodephp/ntfs-mac
-brew install ntfs-mac
+brew install --cask https://raw.githubusercontent.com/kodephp/rust_ntfs/main/Casks/ntfs-mac.rb
+brew uninstall --cask ntfs-mac
 ```
 
-公式定义在 `Formula/ntfs-mac.rb`，自动检测架构并安装 `ntfs-3g` + `fuse-t`（Apple Silicon）或 `macfuse`（Intel）。
+发布新版本时需同步更新 cask 的 `version` 与 `sha256`
+（`shasum -a 256 dist/ntfs-mac-<version>.pkg`）。
 
 ### 质量门
 
 ```bash
 cargo fmt --all --check        # 格式化（零 diff）
 cargo clippy --workspace        # Lint（零警告）
-cargo test --workspace          # 测试（60/60 全绿）
+cargo test --workspace          # 测试（71/71 全绿）
 cargo audit                     # 安全审计
-cargo deny check licenses       # 许可证合规
+cargo deny check                # 许可证 / bans / sources / advisories
+./scripts/gen-third-party-licenses.sh --check   # 第三方清单未过期
 ```
 
 ## 安全设计
@@ -487,8 +573,33 @@ A: 重新打开终端，或检查 `$PATH` 是否包含 `/usr/local/bin`（Intel�
 A: 前往 系统设置 → 隐私与安全性 → 滚动到底部批准。Intel Mac 可能还需要在 系统偏好设置 → 安全与隐私 → 通用 中允许。
 
 **Q: 格式化后 Windows 无法识别？**
-A: 确保使用 `--quick` 快速格式化（默认）。避免使用 `--cluster-size` 自定义簇大小（当前已固定 4096）。
+A: 确保使用 `--quick` 快速格式化（默认）。`--sector-size` 与 `--cluster-size` 已在 0.1.2 起开放，取值受限（扇区 512/4096，簇 512–65536 的 2 的幂）；不确定时保持默认 4096。
 
 ## 许可证
 
-Apache License 2.0 — 详见 [LICENSE](LICENSE)
+Apache License 2.0 — 完整文本见 [LICENSE](LICENSE)。
+
+本项目按 Apache-2.0 分发，因此还随附：
+
+| 文件 | 作用 |
+|------|------|
+| [`LICENSE`](LICENSE) | Apache-2.0 全文 |
+| [`NOTICE`](NOTICE) | 版权声明与第三方归属（Apache-2.0 §4(d) 要求再分发时保留） |
+| [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | 静态链接的 Rust 依赖及其许可证清单 |
+
+命令行可随时查看：`ntfs-mac license`、`ntfs-mac license --full`、`ntfs-mac license --third-party`。
+
+`THIRD_PARTY_LICENSES.md` 由脚本从 `Cargo.lock` 生成，请勿手工编辑：
+
+```bash
+scripts/gen-third-party-licenses.sh           # 重新生成
+scripts/gen-third-party-licenses.sh --check   # 校验是否过期（CI 使用）
+```
+
+依赖许可证策略由 [`deny.toml`](deny.toml) 定义：所有许可证默认拒绝，仅 `allow`
+列表中的逐项放行；MPL-2.0（`colored`、`option-ext` 等）通过具名 `exceptions` 单独
+放行，而不是放宽全局白名单——这样升级依赖引入新的 MPL-2.0 crate 时 CI 会失败并
+提示重新评估。
+
+运行时通过子进程调用的 `ntfs-3g`、`macFUSE`/`FUSE-T`、`rsync` 等程序不随本项目
+分发、也不与本项目链接，各自遵循其自身许可证；详见 [`NOTICE`](NOTICE)。

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 // Synthetic plist test fixture for device::parse_diskutil_plist.
 //
 // The `plist` crate's `from_reader` expects binary or XML plist format,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 kodephp contributors
+
 //! Auto-mount daemon.
 //!
 //! Watches for newly inserted NTFS volumes and mounts them

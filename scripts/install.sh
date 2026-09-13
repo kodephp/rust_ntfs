@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 kodephp contributors
+#
 # ntfs-mac installer: installs macFUSE + ntfs-3g on macOS.
-# Usage: ./scripts/install.sh [--yes] [--help]
+#
+# Usage: install.sh [--yes] [--help]
+#
+# Shipped to /usr/local/share/ntfs-mac/install.sh by scripts/build-macos.sh,
+# and also runnable straight from a source checkout.
 set -euo pipefail
 
 YES=false
@@ -17,7 +24,7 @@ done
 if $HELP; then
     echo "ntfs-mac installer"
     echo ""
-    echo "Usage: ./scripts/install.sh [--yes] [--help]"
+    echo "Usage: ${0##*/} [--yes] [--help]"
     echo ""
     echo "Options:"
     echo "  --yes, -y    Non-interactive mode (auto-confirm)"

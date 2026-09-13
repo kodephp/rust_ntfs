@@ -1,0 +1,115 @@
+# cargo-deny configuration.
+#
+# IMPORTANT — file name
+#   cargo-deny only looks for `deny.toml` or `.deny.toml` next to the
+#   workspace `Cargo.toml`. A file called `Cargo.deny.toml` is NOT read:
+#   cargo-deny prints
+#       [WARN] unable to find a config path, falling back to default config
+#   and then denies *every* license, including MIT. Keep this file named
+#   `deny.toml`.
+#
+# Verify with:
+#   cargo deny check licenses
+#   cargo deny check              # all checks
+#
+# Schema reference:
+#   https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html
+#   (cargo-deny >= 0.18 removed `allow-osi-fsf-free`, `deny`, `copyleft`
+#    and `default`; every license must now be listed in `allow`.)
+
+[licenses]
+# Dev-only dependencies never ship, so they stay out of the policy.
+include-dev = false
+# Build dependencies do end up compiled into the shipped binary graph.
+include-build = true
+# askalono match confidence required before a license file is trusted.
+confidence-threshold = 0.9
+# Report (but do not fail on) entries in `allow` that nothing uses, so the
+# list can be trimmed over time without breaking CI on a platform-specific
+# dependency going away.
+unused-allowed-license = "warn"
+
+# Every license must be listed explicitly; anything absent is denied.
+allow = [
+  # --- Permissive licences that can be shipped inside an Apache-2.0 work ---
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception", # rustc / wasm crates
+  "MIT",
+  "0BSD",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unlicense",
+  "CC0-1.0",
+  # --- Unicode data files (ICU4X stack, pulled in by the Tauri GUI) ---
+  "Unicode-3.0",
+]
+
+# --- Weak, file-level copyleft -------------------------------------------------
+#
+# MPL-2.0 is not on the global allow list on purpose. It is compatible with
+# distributing a larger Apache-2.0 work, but only if the MPL-covered *files*
+# keep their license and their source stays available. The crates below are
+# the only MPL-2.0 code reachable from the workspace, and each gets a named
+# exception rather than a blanket allowance. When a dependency bump drags in
+# a new MPL-2.0 crate the check fails, which is the intended behaviour: the
+# licence situation has to be looked at again, not silently widened.
+
+[[licenses.exceptions]]
+name = "colored" # CLI: terminal colours
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "option-ext" # via `dirs`
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "cssparser" # GUI: HTML/CSS parsing (Tauri)
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "cssparser-macros"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "dtoa-short"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+name = "selectors"
+allow = ["MPL-2.0"]
+
+[licenses.private]
+# First-party workspace crates are Apache-2.0 and unreleased; skipping them
+# keeps `cargo deny` usable before the first publish.
+ignore = true
+
+# ---------------------------------------------------------------------------
+# Bans
+# ---------------------------------------------------------------------------
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Nothing in the graph should be coming from a git source.
+deny = []
+
+# ---------------------------------------------------------------------------
+# Sources
+# ---------------------------------------------------------------------------
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+# ---------------------------------------------------------------------------
+# Advisories
+# ---------------------------------------------------------------------------
+# The dedicated `cargo audit` CI job owns vulnerability reporting for the
+# whole dependency graph. This section only tightens the *unmaintained*
+# policy: a crate that is abandoned matters when it is one we chose, while
+# the `unic-*` and `proc-macro-error` crates that Tauri drags in transitively
+# have no upgrade path and would otherwise need six hand-maintained ignores.
+[advisories]
+yanked = "warn"
+unmaintained = "workspace"
+ignore = []
