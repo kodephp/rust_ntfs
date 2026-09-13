@@ -78,11 +78,33 @@ brew install --cask kodephp/rust_ntfs/ntfs-mac
 brew uninstall --cask ntfs-mac
 ```
 
-**方式三：cargo install（仅 CLI）**
+**方式三：cargo install（仅 CLI，无图形界面）**
 
 ```bash
 cargo install ntfs-mac-cli
 ```
+
+只装命令行程序，**不含** GUI 应用。GUI 通过 Tauri 打包成 `.app`，在 Cargo 清单里
+`publish = false`，无法用 `cargo install` 获取 —— 需要界面请用方式一或方式二。
+
+装完会看到 Cargo 同时下载了 `ntfs-mac-core`，这是正常的：`ntfs-mac-cli` 依赖它，
+Cargo 从 crates.io 自动解析。不是重复安装。
+
+**三个产物是什么关系**（同一个 workspace、同一个版本号）：
+
+| crate | 形态 | 干什么 | 发布渠道 |
+| --- | --- | --- | --- |
+| `ntfs-mac-core` | 库 | 卷探测、挂载/卸载/修复/格式化、依赖探测 —— 全部业务逻辑 | crates.io |
+| `ntfs-mac-cli` | 二进制 `ntfs-mac` | 命令行、daemon、`license` 子命令 | crates.io、`.pkg` |
+| `ntfs-mac-tauri` | 二进制 `ntfs-mac.app` | 菜单栏 + 主窗口 | `.pkg` / Homebrew Cask |
+
+GUI 和 CLI 依赖的是**同一份** `ntfs-mac-core` 源码，在 workspace 内按路径引用、
+**不走 crates.io**。所以两者行为永远一致，`cargo install` 装的版本高低也不影响你
+桌面应用的实际行为。仓库根只有一个 `version`，三个 crate 都通过
+`version.workspace = true` 继承它 —— 不存在"桌面端 0.1.6 配 CLI 0.1.5"这种错配。
+
+`.pkg` 一次装上 GUI + CLI + 文档，因此安装包内的 `ntfs-mac` 与 `ntfs-mac.app`
+必然来自同一次构建。
 
 **方式四：从源码构建**
 
@@ -350,7 +372,7 @@ ntfs-mac license
 # 完整 Apache-2.0 文本（从安装目录或源码树读取 LICENSE）
 ntfs-mac license --full
 
-# 内嵌的第三方 crate 清单（约 490 个 crate，标注 CLI / GUI 归属）
+# 内嵌的第三方 crate 清单（525 个 crate，标注 CLI / GUI 归属）
 ntfs-mac license --third-party
 
 # JSON 输出

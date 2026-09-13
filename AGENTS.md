@@ -22,6 +22,21 @@ crates/
 - **cli** 和 **tauri** 都依赖 core，不互相依赖
 - workspace `default-members` 排除 tauri 以加速迭代
 
+### 交付渠道与版本锁（勿改）
+
+- **tauri 按 workspace 路径引用 core**（`ntfs-mac-core = { workspace = true }`
+  → 根 `Cargo.toml` 的 `{ version, path = "crates/ntfs-mac-core" }`），
+  **永不**从 crates.io 解析 core，也**永不**调用 CLI 二进制。
+  因此 crates.io 上 `ntfs-mac-core@x` / `ntfs-mac-cli@x` 的版本对桌面应用**没有影响**。
+- **tauri `publish = false`**：Tauri 应用不是 cargo-installable 产物，
+  GUI 只通过 `.pkg` / Homebrew Cask 分发。crates.io 上永远只有 core 与 cli 两个包，
+  这是预期状态，不要"补齐" tauri。
+- **单一版本号**：根 `Cargo.toml` 只有一个 `version`，三个 crate 都用
+  `version.workspace = true` 继承。升版只改根这一处，不可能出现桌面端与 CLI 错配。
+  发版时仍需同步 `build-macos.sh` / `Casks/ntfs-mac.rb` / `README.md` 里写死的版本号。
+- **`.pkg` 一体安装**：GUI + CLI + 许可证文档来自同一次构建，因此安装包内的
+  `/usr/local/bin/ntfs-mac` 与 `/Applications/ntfs-mac.app` 必然同版本。
+
 ## 许可证与归属（Apache-2.0）
 
 本项目以 Apache-2.0 分发，配套产物必须保持同步：
