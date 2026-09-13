@@ -9,7 +9,11 @@
 //! Design rules (do not violate — they are the reason this library is
 //! kept under ~1.5k LOC):
 //!
-//! * No `unsafe`, no `unwrap` on production paths, no async runtime.
+//! * Exactly one `unsafe` block exists in this crate: the `SIGTERM`
+//!   send inside [`runner::terminate_gracefully`]. std only offers
+//!   `Child::kill()` (SIGKILL), which cannot warn tools that hold
+//!   filesystem state. Every other addition requires a `SAFETY` comment
+//!   here. No `unwrap` on production paths, no async runtime.
 //! * Every external command goes through [`runner::run`]; failures are
 //!   surfaced as [`error::Error`] with the underlying stderr attached.
 //! * Pure parsing helpers are pure and unit-testable; only the module

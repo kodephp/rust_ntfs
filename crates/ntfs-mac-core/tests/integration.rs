@@ -59,8 +59,116 @@ fn runner_timeout_kills_long_process() {
         },
     )
     .unwrap();
-    // Status 150 is the timeout sentinel.
-    assert_eq!(out.status, 150);
+    // The timeout sentinel is exported, not a magic literal.
+    assert_eq!(out.status, runner::TIMEOUT_STATUS);
+    assert!(
+        out.timed_out,
+        "a killed child must flag itself as timed out"
+    );
+}
+
+#[test]
+fn runner_timeout_flags_are_cleared_on_success() {
+    let out = runner::run("echo", &["hello"], &RunOptions::default()).unwrap();
+    assert!(out.success());
+    assert!(!out.timed_out);
+}
+
+/// The module documents SIGTERM-before-SIGKILL, and the disk tools this
+/// runner supervises (`fsck_ntfs`, `newfs_ntfs`, `rsync`, `cp`) hold
+/// filesystem state while running — so verify the SIGTERM actually
+/// reaches the child. A shell that traps TERM creates a marker file;
+/// if we had jumped straight to SIGKILL the marker would never appear.
+///
+/// The body is a foreground busy loop on purpose: backgrounding a child
+/// would orphan it, and an orphan holding the pipe write-ends is what
+/// [`runner_timeout_survives_orphaned_grandchildren`] covers separately.
+#[test]
+fn runner_timeout_sends_sigterm_before_sigkill() {
+    let tmp = tempfile::tempdir().unwrap();
+    let marker = tmp.path().join("got-term");
+    let script = format!(
+        "trap 'touch {}' TERM; while :; do :; done",
+        marker.display()
+    );
+    let out = runner::run(
+        "sh",
+        &["-c", &script],
+        &RunOptions {
+            timeout: Some(Duration::from_millis(300)),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(out.timed_out);
+    assert_eq!(out.status, runner::TIMEOUT_STATUS);
+    assert!(
+        marker.exists(),
+        "the child never received SIGTERM, so its trap could not have run"
+    );
+}
+
+/// A timed-out command that spawns its own children used to hang `run()`
+/// until the orphan exited: the orphan inherits the pipe write-ends, so
+/// an unconditional `join()` blocked on EOF that never arrives. A real
+/// case is `install_dependencies` timing out mid-`brew install` with
+/// `curl`/`tar` still running. The timeout ceiling must hold regardless.
+#[test]
+fn runner_timeout_survives_orphaned_grandchildren() {
+    let started = std::time::Instant::now();
+    let out = runner::run(
+        "sh",
+        &["-c", "sleep 30 & wait"],
+        &RunOptions {
+            timeout: Some(Duration::from_millis(200)),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(out.timed_out);
+    assert_eq!(out.status, runner::TIMEOUT_STATUS);
+    // timeout (200ms) + SIGTERM grace (1s) + drain bound (500ms).
+    let total = started.elapsed();
+    assert!(
+        total < Duration::from_secs(10),
+        "run() was held hostage by the orphan: {total:?}"
+    );
+}
+
+#[test]
+fn run_expect_success_maps_timeout_to_command_timed_out() {
+    let limit = Duration::from_millis(300);
+    let err = runner::run_expect_success(
+        "sleep",
+        &["60"],
+        &RunOptions {
+            timeout: Some(limit),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    match err {
+        Error::CommandTimedOut { cmd, timeout } => {
+            assert_eq!(cmd, "sleep");
+            assert_eq!(timeout, limit);
+        }
+        other => panic!("expected CommandTimedOut, got {other:?}"),
+    }
+}
+
+#[test]
+fn timed_out_error_does_not_leak_the_internal_sentinel() {
+    let err = Error::CommandTimedOut {
+        cmd: "fsck_ntfs".into(),
+        timeout: Duration::from_secs(30),
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("fsck_ntfs"), "{msg}");
+    assert!(msg.contains("timed out"), "{msg}");
+    assert!(
+        !msg.contains("150"),
+        "the internal status sentinel must not reach the user: {msg}"
+    );
 }
 
 #[test]

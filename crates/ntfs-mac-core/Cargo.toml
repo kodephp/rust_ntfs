@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
 plist = { workspace = true }
+libc = { workspace = true }
 signal-hook = { workspace = true }
 tracing = { workspace = true }
 

@@ -22,7 +22,8 @@ macOS 上的 NTFS 工具集——挂载、卸载、格式化、修复、复制�
 └─────────────────────────────────────────────┘
 ```
 
-- **core**：子进程封装 + plist 解析 + 配置 + 安全确认 token，~1500 LOC，零 `unsafe`、零 async。
+- **core**：子进程封装 + plist 解析 + 配置 + 安全确认 token，~1500 LOC。
+  全代码库仅 1 处 `unsafe`（超时时的 `SIGTERM` 投递，见「安全设计」第 5 条）、零 async。
 - **cli**：`clap` derive 子命令，支持 `-j/--json`、`-v/--verbose`、`--no-color`。
 - **tauri**：深色主题单页 GUI，卷列表 + 操作按钮 + 格式化二次确认。
 
@@ -101,7 +102,7 @@ Cargo 从 crates.io 自动解析。不是重复安装。
 GUI 和 CLI 依赖的是**同一份** `ntfs-mac-core` 源码，在 workspace 内按路径引用、
 **不走 crates.io**。所以两者行为永远一致，`cargo install` 装的版本高低也不影响你
 桌面应用的实际行为。仓库根只有一个 `version`，三个 crate 都通过
-`version.workspace = true` 继承它 —— 不存在"桌面端 0.1.6 配 CLI 0.1.5"这种错配。
+`version.workspace = true` 继承它 —— 不存在"桌面端 0.1.7 配 CLI 0.1.6"这种错配。
 
 `.pkg` 一次装上 GUI + CLI + 文档，因此安装包内的 `ntfs-mac` 与 `ntfs-mac.app`
 必然来自同一次构建。
@@ -382,7 +383,7 @@ ntfs-mac license --json
 输出示例：
 
 ```
-ntfs-mac 0.1.6 — Apache-2.0
+ntfs-mac 0.1.7 — Apache-2.0
 Copyright 2026 kodephp contributors
 https://www.apache.org/licenses/LICENSE-2.0
 
@@ -489,8 +490,8 @@ VERSION=0.2.0 ./scripts/build-macos.sh
 发布前签名与公证（绕过 Gatekeeper）：
 
 ```bash
-codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.6.pkg
-xcrun notarytool submit dist/ntfs-mac-0.1.6.pkg --wait
+codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.7.pkg
+xcrun notarytool submit dist/ntfs-mac-0.1.7.pkg --wait
 ```
 
 ## 开发
@@ -605,7 +606,10 @@ cargo deny check                # 许可证 / bans / sources / advisories
 2. **只读保护**：`mount -r` 可强制只读挂载，防止意外写入。
 3. **命令隔离**：所有外部命令通过 `runner::run` 统一执行，带超时控制（SIGTERM → SIGKILL），无 shell 注入风险。
 4. **配置选项校验**：`mount_options` 每一项都会做格式校验（单 token、无空白/分隔符/引号等注入面字符），非法项在设置与挂载时直接报错，而不是透传给底层工具。
-5. **无 unsafe 代码**：整个代码库零 `unsafe`；生产路径零 `unwrap`（锁获取采用 poison 容忍恢复）。
+5. **unsafe 白名单（仅 1 处）**：全代码库只有 `runner::terminate_gracefully` 里投递
+   `SIGTERM` 的那一处 `unsafe`——std 只有 `Child::kill()`（= SIGKILL），无法给
+   `fsck_ntfs` / `newfs_ntfs` / `rsync` 这些持有文件系统状态的工具先发 SIGTERM 的机会。
+   生产路径零 `unwrap`（锁获取采用 poison 容忍恢复）。
 
 ## 退出码
 

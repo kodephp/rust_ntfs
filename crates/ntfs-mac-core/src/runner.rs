@@ -13,11 +13,24 @@
 
 use std::io::{BufRead, Read, Write};
 use std::os::unix::process::ExitStatusExt;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::error::{Error, Result};
+
+/// Status reported for a subprocess that was killed by its timeout.
+/// Exposed so callers and tests can branch on it without magic numbers.
+pub const TIMEOUT_STATUS: i32 = 150;
+
+/// Grace given after SIGTERM before escalating to SIGKILL.
+const SIGTERM_GRACE: Duration = Duration::from_secs(1);
+
+/// Poll interval used while racing against a deadline.
+const POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+/// Upper bound on waiting for the stdout/stderr readers to flush.
+const READ_DRAIN_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// Output of a completed subprocess.
 #[derive(Debug, Default)]
@@ -26,6 +39,9 @@ pub struct RunResult {
     pub stdout: String,
     pub stderr: String,
     pub duration: Duration,
+    /// `true` when the configured timeout fired and the child was
+    /// terminated. `status` is then [`TIMEOUT_STATUS`].
+    pub timed_out: bool,
 }
 
 impl RunResult {
@@ -68,8 +84,10 @@ impl Default for RunOptions {
 /// Runs a command with [`RunOptions`] and returns [`RunResult`].
 ///
 /// On timeout the child is SIGTERMed and, if it does not exit within
-/// 1s, SIGKILLed. The error variant returned is
-/// [`Error::CommandFailed`] with status `150` (timeout sentinel).
+/// [`SIGTERM_GRACE`], SIGKILLed. `run` itself never fails on timeout:
+/// it returns [`RunResult`] with [`RunResult::timed_out`] set and
+/// [`RunResult::status`] = [`TIMEOUT_STATUS`]. [`run_expect_success`]
+/// turns that into [`Error::CommandTimedOut`].
 pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
     let started = Instant::now();
 
@@ -164,12 +182,12 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
                 timed_out = true;
                 break;
             }
-            std::thread::sleep(Duration::from_millis(20));
+            std::thread::sleep(POLL_INTERVAL);
         }
     }
 
     if timed_out {
-        let _ = child.kill();
+        terminate_gracefully(&mut child);
         waited_status = Some(
             child
                 .wait()
@@ -184,11 +202,30 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
         );
     }
 
-    let _ = stdout_thread.join();
-    let _ = stderr_thread.join();
+    // Drain whatever the child produced, but never let the drain itself
+    // blow past the timeout. `join()` below would otherwise block for as
+    // long as *any* descendant holds a pipe write-end: a timed-out
+    // `brew install` leaves `curl`/`tar` behind, and they keep the pipe
+    // open long after we killed `brew`. The child is already dead or
+    // dying at this point, so returning with a partial capture is the
+    // correct behaviour — the reader threads keep running detached and
+    // finish on their own when the orphan eventually exits.
+    let drain_deadline = Instant::now() + READ_DRAIN_TIMEOUT;
+    while !stdout_thread.is_finished() || !stderr_thread.is_finished() {
+        if Instant::now() >= drain_deadline {
+            break;
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+    if stdout_thread.is_finished() {
+        let _ = stdout_thread.join();
+    }
+    if stderr_thread.is_finished() {
+        let _ = stderr_thread.join();
+    }
 
     let status = match waited_status {
-        Some(_s) if timed_out => 150,
+        Some(_s) if timed_out => TIMEOUT_STATUS,
         Some(s) if s.success() => 0,
         Some(s) => s.code().unwrap_or(-1),
         None => -1,
@@ -212,13 +249,55 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
         stdout,
         stderr,
         duration: started.elapsed(),
+        timed_out,
     })
+}
+
+/// Terminate a timed-out child: SIGTERM first, escalating to SIGKILL
+/// only if it is still alive after [`SIGTERM_GRACE`].
+///
+/// The tools this runner supervises hold filesystem state while they run
+/// (`fsck_ntfs` checks, `newfs_ntfs` formats, `rsync`/`cp` transfer up
+/// to an hour of data), so an unannounced SIGKILL can leave a volume's
+/// journal or a transfer in a worse state than a clean shutdown. This
+/// makes the module-level contract — "SIGTERMs then SIGKILLs" — true
+/// instead of decorative.
+fn terminate_gracefully(child: &mut Child) {
+    let pid = child.id() as libc::pid_t;
+    // SAFETY: `pid` is the pid of a child we spawned moments ago and is
+    // still alive (it just failed `try_wait` above), so it cannot have
+    // been reaped or recycled by another process into an unrelated task.
+    // `SIGTERM` is a valid signal; sending it cannot invalidate any of
+    // our own allocations because `child` still owns the process handle.
+    // `libc::kill` is `unsafe` solely because signalling an arbitrary
+    // pid of unknown ownership is UB-adjacent — both preconditions here
+    // are established by construction.
+    let _ = unsafe { libc::kill(pid, libc::SIGTERM) };
+
+    let grace_deadline = Instant::now() + SIGTERM_GRACE;
+    while Instant::now() < grace_deadline {
+        match child.try_wait() {
+            // The child honoured SIGTERM; it will not be SIGKILLed.
+            Ok(Some(_)) => return,
+            Ok(None) => std::thread::sleep(POLL_INTERVAL),
+            // A wait error means there is no child left to signal.
+            Err(_) => return,
+        }
+    }
+
+    let _ = child.kill();
 }
 
 /// Convenience helper: run a command that should succeed, otherwise
 /// wrap into [`Error::CommandFailed`].
 pub fn run_expect_success(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
     let out = run(cmd, args, opts)?;
+    if out.timed_out {
+        return Err(Error::CommandTimedOut {
+            cmd: cmd.to_string(),
+            timeout: opts.timeout.unwrap_or_default(),
+        });
+    }
     if out.success() {
         Ok(out)
     } else {

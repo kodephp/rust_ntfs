@@ -2329,7 +2329,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "ntfs-mac-cli"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2345,11 +2345,12 @@ dependencies = [
 
 [[package]]
 name = "ntfs-mac-core"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "assert_cmd",
  "dirs 5.0.1",
+ "libc",
  "plist",
  "serde",
  "serde_json",
@@ -2362,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "ntfs-mac-tauri"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "ntfs-mac-core",

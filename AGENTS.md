@@ -87,7 +87,11 @@ crates/
 ## 设计规则（不可违反）
 
 ### 安全
-1. **零 unsafe**：整个代码库不允许 `unsafe` 代码
+1. **unsafe 白名单（仅 1 处）**：全代码库只允许 `runner::terminate_gracefully` 里的
+   `unsafe { libc::kill(pid, SIGTERM) }`。原因：std 只有 `Child::kill()`（= SIGKILL），
+   无法给持有文件系统状态的工具（`fsck_ntfs` / `newfs_ntfs` / `rsync` / `cp`）
+   先发 SIGTERM 的机会。新增任何 `unsafe` 必须写明 `SAFETY` 契约，并同步更新
+   本条与 `crates/ntfs-mac-core/src/lib.rs` 顶部的规则清单
 2. **零生产 unwrap**：生产路径不允许 `unwrap()`，测试中可以；锁获取用 `unwrap_or_else(PoisonError::into_inner)` 容忍 poison
 3. **破坏性操作强制确认**：format/erase 需要 `DestructiveToken` + 用户输入确认短语
 4. **命令隔离**：所有外部命令经 `runner::run` 统一执行，带 timeout，无 shell 注入；`RunOptions.capture` 默认 `true`（手动 Default），`false` 才继承 stdio
@@ -254,6 +258,27 @@ cargo run -p ntfs-mac-cli -- license            # 人工查看许可证摘要
 - `scripts/test-frontend.sh` 共 7 项契约检查，含「无裸 invoke」「每命令有超时
   上限」「UI 调用的命令集与 `generate_handler!` 注册的完全一致」。新增命令时
   三处（后端 handler、前端 `call()`、`CALL_TIMEOUT_MS`）必须同时更新。
+
+### 子进程超时契约（v0.1.7 起强制，覆盖全仓库）
+
+- **超时上限是硬保证**：`runner::run` 的 `timeout` 一旦到期就必定返回，不会
+  被子进程拖住。两层守护：SIGTERM 后给 `SIGTERM_GRACE`（1s）优雅退出，
+  stdout/stderr 读取线程的 join 上限为 `READ_DRAIN_TIMEOUT`（500ms）。
+  没有 drain 上限时，超时的 `brew install` 会留下继承管道写端的 `curl`/`tar`，
+  让 `run()` 卡到孤进程退出为止（实测曾卡满 60s）——测试
+  `runner_timeout_survives_orphaned_grandchildren` 就是防这个回退。
+- **先 SIGTERM 再 SIGKILL**：`terminate_gracefully` 先发 SIGTERM。这些工具
+  （`fsck_ntfs` 检查、`newfs_ntfs` 格式化、`rsync`/`cp` 传输最长 1h）运行时
+  持有文件系统状态，直接 SIGKILL 比干净退出留下更糟的卷状态。行为由
+  `runner_timeout_sends_sigterm_before_sigkill` 用 shell trap 写 marker 文件验证。
+- **超时不泄漏内部哨兵**：`runner::run` 在超时时返回 `timed_out = true` +
+  `status = TIMEOUT_STATUS`（150，已导出常量，不写魔法数字）；
+  `run_expect_success` 把它转成 `Error::CommandTimedOut { cmd, timeout }`。
+  用户看到的是「command `fsck_ntfs` timed out after 30s」，
+  而不是「exited with status 150」+ 空 stderr。CLI 退出码走既有兜底（1）。
+- **新增子进程调用必须带 timeout**：`RunOptions::default().timeout == None`
+  即无界 `child.wait()`。全仓库 `src/` 下不允许出现 `RunOptions::default()`
+  作为实参（只有测试里可以用，测试命令都是 `echo`/`false`/`sleep`）。
 
 ### 禁止
 

@@ -29,6 +29,10 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{ConfigError, Error, Result};
+// Only `RunOptions` is imported at module scope: this module defines its
+// own `pub fn run` (the daemon loop), so `runner::run` is imported per
+// function below to avoid the name collision.
+use crate::runner::RunOptions;
 use crate::{Config, device, mount};
 
 /// Options for the daemon.
@@ -223,10 +227,31 @@ pub struct LaunchAgentInstall {
     pub load_error: Option<String>,
 }
 
+/// Ceiling for one `launchctl` call. These normally answer in a few
+/// milliseconds, but `launchctl` blocks indefinitely against a wedged
+/// launchd session — and a hung `ntfs-mac daemon --install` is far
+/// worse than a 20-second failure. Keep every call site below on this
+/// ceiling rather than `RunOptions::default()` (which has no timeout).
+const LAUNCHCTL_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// `id -u` is a trivial local lookup; five seconds is already generous.
+const UID_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn launchctl_opts() -> RunOptions {
+    RunOptions {
+        timeout: Some(LAUNCHCTL_TIMEOUT),
+        ..Default::default()
+    }
+}
+
 /// Numeric UID of the current user, via `id -u` (std has no uid API).
 fn user_uid() -> Option<String> {
-    use crate::runner::{RunOptions, run};
-    let out = run("id", &["-u"], &RunOptions::default()).ok()?;
+    use crate::runner::run;
+    let opts = RunOptions {
+        timeout: Some(UID_TIMEOUT),
+        ..Default::default()
+    };
+    let out = run("id", &["-u"], &opts).ok()?;
     if out.success() {
         let s = out.stdout.trim().to_string();
         if s.chars().all(|c| c.is_ascii_digit()) && !s.is_empty() {
@@ -245,7 +270,7 @@ fn user_uid() -> Option<String> {
 /// with status 0, so the exit code alone proves nothing — success is
 /// always verified with `launchctl print`.
 fn load_launchagent(plist_path: &std::path::Path) -> Result<()> {
-    use crate::runner::{RunOptions, run};
+    use crate::runner::run;
     let plist = plist_path.to_string_lossy().to_string();
     let mut failures: Vec<String> = Vec::new();
 
@@ -253,7 +278,7 @@ fn load_launchagent(plist_path: &std::path::Path) -> Result<()> {
         if let Ok(out) = run(
             "launchctl",
             &["bootstrap", &format!("gui/{uid}"), &plist],
-            &RunOptions::default(),
+            &launchctl_opts(),
         ) {
             if out.success() && is_launchagent_loaded() {
                 return Ok(());
@@ -270,7 +295,7 @@ fn load_launchagent(plist_path: &std::path::Path) -> Result<()> {
         }
     }
 
-    if let Ok(out) = run("launchctl", &["load", &plist], &RunOptions::default()) {
+    if let Ok(out) = run("launchctl", &["load", &plist], &launchctl_opts()) {
         if is_launchagent_loaded() {
             return Ok(());
         }
@@ -296,26 +321,26 @@ fn load_launchagent(plist_path: &std::path::Path) -> Result<()> {
 /// loaded there is nothing to do, and a failed bootout must not stop
 /// the plist removal.
 fn unload_launchagent(plist_path: &std::path::Path) {
-    use crate::runner::{RunOptions, run};
+    use crate::runner::run;
     let plist = plist_path.to_string_lossy().to_string();
     if let Some(uid) = user_uid() {
         let _ = run(
             "launchctl",
             &["bootout", &format!("gui/{uid}/{LAUNCHAGENT_LABEL}")],
-            &RunOptions::default(),
+            &launchctl_opts(),
         );
     }
-    let _ = run("launchctl", &["unload", &plist], &RunOptions::default());
+    let _ = run("launchctl", &["unload", &plist], &launchctl_opts());
 }
 
 /// Whether launchd currently has the agent loaded.
 pub fn is_launchagent_loaded() -> bool {
-    use crate::runner::{RunOptions, run};
+    use crate::runner::run;
     if let Some(uid) = user_uid() {
         if let Ok(out) = run(
             "launchctl",
             &["print", &format!("gui/{uid}/{LAUNCHAGENT_LABEL}")],
-            &RunOptions::default(),
+            &launchctl_opts(),
         ) {
             return out.success();
         }

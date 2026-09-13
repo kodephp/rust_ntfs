@@ -1,5 +1,5 @@
-# Workspace root. Keep the three crates in sync; the GUI crate wraps
-# the CLI crate over the core library.
+# Workspace root. Both delivery binaries (CLI + Tauri GUI) link the
+# same `ntfs-mac-core` library by workspace path; neither wraps the other.
 [workspace]
 resolver = "2"
 members = [
@@ -15,7 +15,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -25,7 +25,7 @@ description = "A small NTFS toolkit for macOS: mount, unmount, format, fix, copy
 
 [workspace.dependencies]
 # Internal crates.
-ntfs-mac-core = { version = "0.1.6", path = "crates/ntfs-mac-core" }
+ntfs-mac-core = { version = "0.1.7", path = "crates/ntfs-mac-core" }
 
 # CLI.
 clap = { version = "4.5", features = ["derive", "wrap_help", "color"] }
@@ -44,6 +44,10 @@ anyhow = { version = "1" }
 # System integration.
 dirs = "5"
 plist = "1"
+# `libc::kill(pid, SIGTERM)` for the runner's graceful shutdown. std
+# only offers SIGKILL via `Child::kill()`, which cannot be used for
+# tools that hold filesystem state (see `runner::terminate_gracefully`).
+libc = "0.2"
 
 # Output / UX.
 colored = "3"

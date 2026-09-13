@@ -4,6 +4,7 @@
 //! Typed errors + POSIX-style exit codes used by the CLI/GUI layer.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use thiserror::Error;
 
@@ -47,6 +48,15 @@ pub enum Error {
         #[source]
         io: Option<std::io::Error>,
     },
+
+    /// The subprocess exceeded its configured timeout and had to be
+    /// terminated. Distinct from [`Error::CommandFailed`] because the
+    /// tool produced no diagnosis of its own: `fsck_ntfs` running out
+    /// of time is a different failure mode than `fsck_ntfs` reporting
+    /// corruption, and the fix for each is different (raise the limit
+    /// or fix the volume).
+    #[error("command `{cmd}` timed out after {timeout:?}")]
+    CommandTimedOut { cmd: String, timeout: Duration },
 
     /// The target binary is not on PATH. `hint` is a copy-pastable
     /// fix instruction.
