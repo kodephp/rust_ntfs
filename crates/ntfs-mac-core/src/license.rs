@@ -58,8 +58,7 @@ pub const APACHE_CLAUSES: &[(&str, &str)] = &[
 ///
 /// The source tree comes first so a `cargo run` checkout resolves without
 /// any installation, followed by the layouts produced by
-/// `scripts/build-macos.sh` and the Homebrew formula. Mirrors the strategy
-/// used for the sponsor QR asset.
+/// `scripts/build-macos.sh` and the Homebrew formula.
 const RESOURCE_DIRS: &[&str] = &[
     // <repo root> — the crate lives at <repo>/crates/ntfs-mac-core.
     concat!(env!("CARGO_MANIFEST_DIR"), "/../.."),

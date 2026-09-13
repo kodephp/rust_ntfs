@@ -1,6 +1,6 @@
 cask "ntfs-mac" do
-  version "0.1.4"
-  sha256 "dbaf0826ea04ecf4b2414d2a4f3651e7e8329c6315e97ec7f03c4818234ce556"
+  version "0.1.5"
+  sha256 "69bb1d658c62662d4ce4720e782f8b24f1c8fb945fe06211d1ad2930b4c254d4"
 
   url "https://github.com/kodephp/rust_ntfs/releases/download/v#{version}/ntfs-mac-#{version}.pkg"
   name "ntfs-mac"

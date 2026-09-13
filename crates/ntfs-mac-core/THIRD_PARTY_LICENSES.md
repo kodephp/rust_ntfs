@@ -7,7 +7,7 @@ each shipped artifact statically links the Rust crates listed below.
 This file is the attribution inventory for those crates.
 
 - Generated: 2026-09-13
-- Crates: 487 total, 87 CLI, 447 GUI
+- Crates: 491 total, 87 CLI, 451 GUI
 - Source: `cargo metadata` (honouring `Cargo.lock`) reduced to packages
   reachable over *runtime* edges; `dev`-only edges are excluded, so the
   list matches what ships rather than the whole test matrix
@@ -31,7 +31,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | --- | ---: |
 | Apache-2.0 | 2 |
 | MIT | 109 |
-| MIT OR Apache-2.0 | 240 |
+| MIT OR Apache-2.0 | 241 |
 | Apache-2.0 OR MIT | 36 |
 | BSD-3-Clause | 2 |
 | ISC | 1 |
@@ -44,6 +44,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | 5 |
 | Apache-2.0/MIT | 3 |
 | BSD-3-Clause AND MIT | 1 |
+| BSD-3-Clause OR Apache-2.0 | 2 |
 | BSD-3-Clause OR MIT OR Apache-2.0 | 2 |
 | BSD-3-Clause/MIT | 1 |
 | CC0-1.0 OR MIT-0 OR Apache-2.0 | 1 |
@@ -53,7 +54,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | MIT/Apache-2.0 | 19 |
 | MPL-2.0 | 6 |
 | Unicode-3.0 | 18 |
-| Unlicense OR MIT | 9 |
+| Unlicense OR MIT | 10 |
 | Unlicense/MIT | 2 |
 | Zlib OR Apache-2.0 OR MIT | 17 |
 
@@ -262,6 +263,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | iana-time-zone | 0.1.65 |  | ✓ | [https://github.com/strawlab/iana-time-zone](https://github.com/strawlab/iana-time-zone) |
 | iana-time-zone-haiku | 0.1.2 |  | ✓ | [https://github.com/strawlab/iana-time-zone](https://github.com/strawlab/iana-time-zone) |
 | idna | 1.1.0 |  | ✓ | [https://github.com/servo/rust-url/](https://github.com/servo/rust-url/) |
+| image | 0.25.10 |  | ✓ | [https://github.com/image-rs/image](https://github.com/image-rs/image) |
 | ipnet | 2.12.2 |  | ✓ | [https://github.com/krisprice/ipnet](https://github.com/krisprice/ipnet) |
 | is_terminal_polyfill | 1.70.2 | ✓ |  | [https://github.com/polyfill-rs/is_terminal_polyfill](https://github.com/polyfill-rs/is_terminal_polyfill) |
 | itoa | 1.0.18 | ✓ | ✓ | [https://github.com/dtolnay/itoa](https://github.com/dtolnay/itoa) |
@@ -540,6 +542,13 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | --- | --- | :---: | :---: | --- |
 | brotli | 8.0.4 |  | ✓ | [https://github.com/dropbox/rust-brotli](https://github.com/dropbox/rust-brotli) |
 
+### BSD-3-Clause OR Apache-2.0
+
+| Crate | Version | CLI | GUI | Repository |
+| --- | --- | :---: | :---: | --- |
+| moxcms | 0.8.1 |  | ✓ | [https://github.com/awxkee/moxcms.git](https://github.com/awxkee/moxcms.git) |
+| pxfm | 0.1.30 |  | ✓ | [https://github.com/awxkee/pxfm](https://github.com/awxkee/pxfm) |
+
 ### BSD-3-Clause OR MIT OR Apache-2.0
 
 | Crate | Version | CLI | GUI | Repository |
@@ -644,6 +653,7 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | --- | --- | :---: | :---: | --- |
 | aho-corasick | 1.1.5 | ✓ | ✓ | [https://github.com/BurntSushi/aho-corasick](https://github.com/BurntSushi/aho-corasick) |
 | byteorder | 1.5.0 |  | ✓ | [https://github.com/BurntSushi/byteorder](https://github.com/BurntSushi/byteorder) |
+| byteorder-lite | 0.1.0 |  | ✓ | [https://github.com/image-rs/byteorder-lite](https://github.com/image-rs/byteorder-lite) |
 | jiff | 0.2.35 |  | ✓ | [https://github.com/BurntSushi/jiff](https://github.com/BurntSushi/jiff) |
 | jiff-core | 0.1.0 |  | ✓ | [https://github.com/BurntSushi/jiff](https://github.com/BurntSushi/jiff) |
 | jiff-static | 0.2.35 |  | ✓ | [https://github.com/BurntSushi/jiff](https://github.com/BurntSushi/jiff) |
@@ -681,4 +691,4 @@ with `scripts/gen-third-party-licenses.sh --check`.
 | objc2-web-kit | 0.3.2 |  | ✓ | [https://github.com/madsmtm/objc2](https://github.com/madsmtm/objc2) |
 | tinyvec | 1.13.2 |  | ✓ | [https://github.com/Lokathor/tinyvec](https://github.com/Lokathor/tinyvec) |
 
-Total: 487 crates.
+Total: 491 crates.

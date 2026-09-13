@@ -10,27 +10,25 @@
   "app": {
     "windows": [
       {
-        "title": "ntfs-mac \u2014 NTFS Toolkit",
-        "width": 900,
-        "height": 650,
-        "minWidth": 700,
-        "minHeight": 500,
+        "title": "ntfs-mac — NTFS 工具箱",
+        "width": 940,
+        "height": 680,
+        "minWidth": 760,
+        "minHeight": 540,
         "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; image-src 'self'; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; image-src 'self' data:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
     "icon": [
+      "icons/icon.icns",
       "icons/icon.png"
     ],
-    "resources": {
-      "../src/assets/sponsor-qr.svg": "assets/sponsor-qr.svg"
-    },
     "macOS": {
       "minimumSystemVersion": "12.0",
       "entitlements": null

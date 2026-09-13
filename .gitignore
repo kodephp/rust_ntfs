@@ -13,7 +13,7 @@
 # Tauri
 #
 # NOTE: `crates/ntfs-mac-tauri/src/` is the hand-written GUI frontend
-# (`index.html`, `app.js`, `styles.css`, `assets/`) and is what
+# (`index.html`, `app.js`, `styles.css`) and is what
 # `build.frontendDist: "../src"` in tauri.conf.json points at. It used to
 # be ignored here, which meant the repository shipped without the GUI
 # source: neither a fresh clone nor CI could build ntfs-mac.app.

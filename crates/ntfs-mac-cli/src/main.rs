@@ -122,12 +122,6 @@ enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
-    /// Show sponsor / donation QR code location
-    Sponsor {
-        /// Reveal the QR code file in Finder
-        #[arg(long)]
-        reveal: bool,
-    },
     /// Show licence, NOTICE and third-party attribution details
     License {
         /// Print the complete Apache-2.0 licence text
@@ -326,7 +320,6 @@ fn run(cli: &Cli) -> Result<()> {
             dry_run,
         } => cmd_copy(cli, source, destination, *delete, *dry_run),
         Command::Config { command } => cmd_config(cli, &cfg, command),
-        Command::Sponsor { reveal } => cmd_sponsor(cli, *reveal),
         Command::License { full, third_party } => cmd_license(cli, *full, *third_party),
         Command::Completions { shell } => cmd_completions(*shell),
     }
@@ -1041,79 +1034,4 @@ fn cmd_config(cli: &Cli, cfg: &Config, command: &ConfigCommand) -> Result<()> {
             Ok(())
         }
     }
-}
-
-/// Sponsor / donation QR code helper.
-///
-/// The QR code image lives at `crates/ntfs-mac-tauri/src/assets/sponsor-qr.svg`
-/// in the source tree and is bundled into the .app on release builds.
-/// Replace that file with your own payment QR code to receive donations.
-fn cmd_sponsor(cli: &Cli, reveal: bool) -> Result<()> {
-    // Candidate paths: source tree first (works in dev), then bundle locations.
-    let candidates = [
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../ntfs-mac-tauri/src/assets/sponsor-qr.svg"
-        ),
-        "/Applications/ntfs-mac.app/Contents/Resources/assets/sponsor-qr.svg",
-        "assets/sponsor-qr.svg",
-    ];
-
-    let found = candidates
-        .iter()
-        .find(|p| std::path::Path::new(p).exists())
-        .map(|p| p.to_string());
-
-    let path = match found {
-        Some(p) => p,
-        None => {
-            // File not found — print instructions.
-            let msg = "Sponsor QR code not found.\n\nTo enable donations:\n  1. Create a QR code image (PNG/SVG/JPG)\n  2. Place it at: crates/ntfs-mac-tauri/src/assets/sponsor-qr.svg\n  3. Rebuild: cargo build --release\n\nCurrent default: src/assets/sponsor-qr.svg (placeholder)";
-            if cli.json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(
-                        &serde_json::json!({ "found": false, "hint": "Place QR at src/assets/sponsor-qr.svg" })
-                    )?
-                );
-            } else {
-                println!("{}", msg.yellow());
-            }
-            return Ok(());
-        }
-    };
-
-    if reveal {
-        // `open -R` reveals the file in Finder (macOS).
-        let status = std::process::Command::new("open")
-            .args(["-R", &path])
-            .status()
-            .map_err(|e| anyhow::anyhow!("cannot launch Finder: {e}"))?;
-        if !status.success() {
-            return Err(anyhow::anyhow!(
-                "Finder could not reveal `{path}` (exit status {status})"
-            ));
-        }
-    }
-
-    if cli.json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(
-                &serde_json::json!({ "qr_path": path, "revealed": reveal })
-            )?
-        );
-    } else {
-        println!("{}", "Sponsor QR Code".bold().green());
-        println!("  Path: {}", path.cyan());
-        if reveal {
-            println!("  {}", "Revealed in Finder".green());
-        }
-        println!();
-        println!("{}", "To replace with your own QR code:".bold());
-        println!("  1. Create a QR code image (PNG/SVG/JPG)");
-        println!("  2. Replace: {}", path.cyan());
-        println!("  3. Rebuild: cargo build --release");
-    }
-    Ok(())
 }

@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-VERSION="${VERSION:-0.1.4}"
+VERSION="${VERSION:-0.1.5}"
 BUNDLE_ID="com.kodephp.ntfs-mac"
 APP_NAME="ntfs-mac"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -266,14 +266,15 @@ cat > "$STAGE/pkg-resources/readme.html" <<HTML
   <h1>ntfs-mac 安装完成</h1>
   <p>安装已完成。以下是使用方式：</p>
   <h3>图形界面</h3>
-  <p>从 <code>/Applications</code> 打开 <strong>ntfs-mac</strong>，浏览 NTFS 卷、挂载分区、复制文件、运行诊断。</p>
+  <p>从 <code>/Applications</code> 打开 <strong>ntfs-mac</strong>，它会常驻
+     <strong>菜单栏</strong>：下拉即可看到全部 NTFS 卷，直接挂载、在 Finder 中打开、
+     卸载或弹出移动硬盘。窗口内可切换中文 / English（默认中文）。</p>
   <h3>命令行</h3>
   <pre><code>ntfs-mac list        # 列出 NTFS 分区
 ntfs-mac mount &lt;id&gt;  # 挂载分区（只读）
 ntfs-mac rw &lt;id&gt;     # 挂载分区（读写，需内核扩展）
 ntfs-mac doctor      # 检查依赖
 ntfs-mac status      # 查看状态
-ntfs-mac sponsor     # 显示赞助二维码路径
 ntfs-mac license     # 查看许可证与第三方组件归属</code></pre>
   <h3>读写访问</h3>
   <p>如需读写访问，请运行安装脚本加载内核扩展：</p>

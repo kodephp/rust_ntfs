@@ -109,6 +109,30 @@ cargo build --release -p ntfs-mac-tauri
 
 **Rust 版本要求**：1.85+（edition 2024）
 
+## GUI 用法（菜单栏 + 主窗口）
+
+ntfs-mac 是一款 **菜单栏常驻应用**（同 [Mounty](https://mounty.app/) 的形态）：
+
+- **菜单栏图标**：启动后常驻 macOS 顶栏。下拉即得扁平菜单 ——
+  每个 NTFS 卷一行，可直接**挂载 / 在 Finder 中打开 / 卸载 / 弹出移动硬盘**，
+  下面是依赖状态、刷新、打开主窗口、安装依赖、退出。
+- **自动刷新**：每 5 秒重新扫描一次磁盘；插入或弹出移动硬盘后菜单与窗口都会自动更新。
+- **主窗口**：更完整的控制台 —— 系统状态（依赖探测 + 一键安装）、
+  卷列表（挂载 / 只读挂载 / 修复 / 深度修复 / 格式化 / 打开 / 弹出）、关于信息。
+- **关闭窗口不退出**：点红色关闭按钮只是隐藏窗口，进程仍留在菜单栏；
+  要退出请从菜单栏选「退出 ntfs-mac」。
+
+### 中英文切换（默认中文）
+
+界面默认中文，可在窗口右上角切换「中文 / English」，选择会记住（`localStorage`）。
+菜单栏文案与窗口文案共用同一份字典，修改任一处都需要同步另一边 ——
+`scripts/test-frontend.sh` 会在 CI 中断言两边一致，漂移即失败。
+
+```bash
+# 前端质量门（语法 + 中英文契约 + DOM id 一致性）
+scripts/test-frontend.sh
+```
+
 ## CLI 用法
 
 ```
@@ -295,29 +319,6 @@ ntfs-mac config set require_confirmation false
 ntfs-mac config reset    # 重置为默认
 ```
 
-### `sponsor` — 赞助/收款二维码
-
-显示赞助收款二维码的位置。GUI 底部和 CLI 均集成了赞助入口。
-
-```bash
-# 显示二维码路径
-ntfs-mac sponsor
-
-# 在 Finder 中显示二维码文件
-ntfs-mac sponsor --reveal
-
-# JSON 输出
-ntfs-mac sponsor --json
-```
-
-**替换为自有二维码**：
-
-1. 生成支付二维码图片（微信/支付宝收款码等，PNG/SVG/JPG 均可）
-2. 替换占位文件：`crates/ntfs-mac-tauri/src/assets/sponsor-qr.svg`
-3. 重新构建：`cargo build --release`
-
-打包后二维码文件会随 `.app` 一起分发（位于 `.app/Contents/Resources/assets/`），GUI 窗口底部"Support This Project"卡片和 CLI `sponsor` 命令均可访问。
-
 ### `license` — 许可证与第三方归属
 
 查看本项目许可证、`NOTICE` 与静态链接的第三方组件清单。所有内容都来自二进制本身
@@ -340,7 +341,7 @@ ntfs-mac license --json
 输出示例：
 
 ```
-ntfs-mac 0.1.4 — Apache-2.0
+ntfs-mac 0.1.5 — Apache-2.0
 Copyright 2026 kodephp contributors
 https://www.apache.org/licenses/LICENSE-2.0
 
@@ -447,8 +448,8 @@ VERSION=0.2.0 ./scripts/build-macos.sh
 发布前签名与公证（绕过 Gatekeeper）：
 
 ```bash
-codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.4.pkg
-xcrun notarytool submit dist/ntfs-mac-0.1.4.pkg --wait
+codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.5.pkg
+xcrun notarytool submit dist/ntfs-mac-0.1.5.pkg --wait
 ```
 
 ## 开发

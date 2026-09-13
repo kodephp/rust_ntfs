@@ -48,6 +48,12 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      # Fails if the window's i18n dictionary drifts from the menu-bar
+      # `Labels` in lib.rs, or if app.js references a DOM id that no longer
+      # exists. macOS runner ships with Node.js.
+      - name: Frontend contract (i18n + DOM ids)
+        run: scripts/test-frontend.sh
+
   # ------------------------------------------------------------------
   # Build release binaries + macOS .pkg installer.
   # ------------------------------------------------------------------

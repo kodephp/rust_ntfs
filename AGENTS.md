@@ -133,6 +133,12 @@ cd crates/ntfs-mac-tauri/src-tauri && cargo tauri dev
 # GUI 构建 .app
 cd crates/ntfs-mac-tauri/src-tauri && cargo tauri build
 
+# 前端质量门（JS 语法 + 中英文契约 + DOM id 一致性）
+scripts/test-frontend.sh
+
+# 生成应用图标与菜单栏模板图
+scripts/gen-icons.py
+
 # 许可证 / 第三方归属
 cargo deny check                       # deny.toml 策略（licenses/bans/sources/advisories）
 ./scripts/gen-third-party-licenses.sh           # 重新生成 THIRD_PARTY_LICENSES.md
@@ -143,12 +149,13 @@ cargo run -p ntfs-mac-cli -- license            # 人工查看许可证摘要
 ## 发布流程
 
 1. 实现 → `cargo test --workspace` 全绿
-2. `cargo clippy` 无 error
-3. `cargo fmt --check` 零差异
-4. 更新版本号（Cargo.toml workspace.package.version）
-5. 更新 CHANGELOG.md
-6. `git add <指定文件>`（禁用 `git add -A`）
-7. `git commit` + `git tag` + `git push`（需用户确认）
+2. `cargo clippy --workspace --all-targets -- -D warnings` 无 error
+3. `cargo fmt --all -- --check` 零差异
+4. `scripts/test-frontend.sh` 通过（前端中英文契约）
+5. `cargo deny check` 通过
+6. 更新版本号（Cargo.toml workspace.package.version，同步 build-macos.sh / Casks / README）
+7. `git add <指定文件>`（禁用 `git add -A`）
+8. `git commit` + `git tag` + `git push`（需用户确认）
 
 ## 退出码规范
 
@@ -182,31 +189,38 @@ cargo run -p ntfs-mac-cli -- license            # 人工查看许可证摘要
 
 所有命令通过 `runner::run` 执行，timeout 默认 30s（格式化 60s）。
 
-## 赞助/收款二维码
+## GUI 前端约束（`crates/ntfs-mac-tauri/src`）
 
-### 文件位置
+### 入口方式（勿改）
 
-```
-crates/ntfs-mac-tauri/src/assets/sponsor-qr.svg   ← 占位文件，替换为自有二维码
-```
+- **必须**用 `window.__TAURI_INTERNALS__.invoke` / `internals.event.listen` 调用后端。
+  Tauri v2 默认**不注入** `window.__TAURI__`，写 `__TAURI__.core` 会导致窗口空白。
+- `invoke` 参数用 camelCase（`deviceId` → `device_id`、`useFsck` → `use_fsck`）。
 
-- 打包后位于 `.app/Contents/Resources/assets/sponsor-qr.svg`
-- 格式：SVG（推荐，体积小、任意分辨率）或 PNG/JPG
-- 替换后重新 `cargo build --release` 即生效
+### 菜单栏托盘（`lib.rs`）
 
-### 入口
+- 托盘 id `ntfs-mac`，菜单 id `ntfs-mac-menu`，5s 轮询重建，签名去重避免重建 `NSMenu`。
+- 扁平 mounty 式布局：卷列表 → 依赖状态 → 刷新 / 主窗口 / 安装依赖 → 退出。
+- 每卷菜单项 id 带前缀：`vol-mount-` / `vol-open-` / `vol-unmount-` / `vol-eject-` + 设备号。
+- 关闭窗口**不得**退出进程（`CloseRequested` → `prevent_close()` + `hide()`）；
+  退出只走托盘 `quit`。
+- 托盘图标必须是纯黑 + alpha 模板图（`icon_as_template(true)`），由 `scripts/gen-icons.py` 生成。
 
-| 入口 | 说明 |
-|------|------|
-| GUI 底部 "Support This Project" 卡片 | 显示二维码 + "Copy QR Path" / "Reveal in Finder" 按钮 |
-| CLI `ntfs-mac sponsor` | 显示二维码路径，`--reveal` 在 Finder 中打开 |
-| Tauri 命令 `reveal_sponsor_qr` | 返回二维码路径并在 Finder 中显示 |
+### 中英文 i18n（默认中文）
 
-### 约定
+- `lib.rs` 的 `Labels` 结构体与 `app.js` 的 `I18N` 字典必须**逐键逐值一致**
+  （`header` / `empty` / `mount` / `open` / `unmount` / `eject` / `refresh` /
+  `show_window` / `install_deps` / `quit` / `ready` / `missing` / `volumes_n` / `mounted_n`）。
+- `app.js` 的 `I18N[lang].ui` 只放窗口专用文案，不进 `Labels`。
+- `scripts/test-frontend.sh` 会对比两边，漂移即失败。改文案必须同步改两处。
+- 语言存 `localStorage["ntfs-mac.language"]`，后端存 `AppState.language`；
+  `labels()` / `set_language` 对非 `"en"` 一律回落到中文。
+- `index.html` 必须 `lang="zh"`，静态可见文案全部为中文。
 
-- 占位 SVG 带有 "REPLACE ME" 水印，生产环境必须替换
-- 二维码图片随 `.app` 一起分发（`frontendDist` 打包机制）
-- CSP 已配置 `image-src 'self'`，允许同源图片加载
+### 禁止
+
+- 前端不得新增构建步骤（无 npm / bundler），保持纯 HTML/CSS/JS。
+- 不得把赞助/收款二维码写回界面（已随 v0.1.5 移除，含 `reveal_sponsor_qr` 命令与 CLI `sponsor` 子命令）。
 
 ## 安装包构建
 
@@ -299,9 +313,9 @@ dist/pkg-payload/
 ### 验证
 
 ```bash
-pkgutil --payload-files dist/ntfs-mac-0.1.4.pkg    # 只应出现 Applications/ 与 usr/local/
-xar -tf dist/ntfs-mac-0.1.4.pkg | head             # 查看顶层结构
-pkgutil --check-signature dist/ntfs-mac-0.1.4.pkg  # 签名检查（未签名会退出码 1）
+pkgutil --payload-files dist/ntfs-mac-0.1.5.pkg    # 只应出现 Applications/ 与 usr/local/
+xar -tf dist/ntfs-mac-0.1.5.pkg | head             # 查看顶层结构
+pkgutil --check-signature dist/ntfs-mac-0.1.5.pkg  # 签名检查（未签名会退出码 1）
 ```
 
 ## 发布检查清单（Release Checklist）

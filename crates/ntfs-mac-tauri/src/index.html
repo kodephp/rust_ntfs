@@ -1,67 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ntfs-mac</title>
+    <title>ntfs-mac — NTFS 工具箱</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header>
-        <h1>🖥️ ntfs-mac</h1>
-        <div class="status-bar">
-            <span id="platform-info"></span>
-            <button id="refresh-btn" class="btn btn-small">↻ Refresh</button>
-        </div>
-    </header>
-    
-    <section id="deps-section" class="card">
-        <h2>System Status</h2>
-        <div id="deps-status"></div>
-        <button id="install-btn" class="btn btn-warning" style="display:none">Install Missing Dependencies</button>
-    </section>
-    
-    <section class="card">
-        <h2>NTFS Volumes</h2>
-        <div id="volumes-list"></div>
-    </section>
-    
-    <section class="card sponsor-card">
-        <h2>Support This Project</h2>
-        <div class="sponsor-content">
-            <div class="sponsor-qr">
-                <img id="sponsor-qr-img" src="assets/sponsor-qr.svg" alt="Sponsor QR Code"
-                     title="Click to open / replace with your QR code">
-                <p class="sponsor-hint">
-                    Replace <code>src/assets/sponsor-qr.svg</code> with your payment QR code
-                </p>
+    <main class="app">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-title">ntfs-mac</div>
+                <div class="brand-sub" id="platform-info"><span data-i18n="ui.loading">检测中…</span></div>
             </div>
-            <div class="sponsor-info">
-                <p>If ntfs-mac saves you time, consider a donation to help keep it maintained.</p>
-                <div class="sponsor-actions">
-                    <button class="btn btn-small btn-secondary" id="sponsor-copy-btn">Copy QR Path</button>
-                    <button class="btn btn-small btn-secondary" id="sponsor-open-btn">Reveal in Finder</button>
+            <div class="topbar-actions">
+                <div class="lang-toggle" role="group" aria-label="language">
+                    <button id="lang-zh" class="lang-btn" type="button">中文</button>
+                    <button id="lang-en" class="lang-btn" type="button">English</button>
                 </div>
+                <button id="refresh-btn" class="btn btn-ghost" type="button" data-i18n="refresh">刷新</button>
             </div>
-        </div>
-    </section>
-    
-    <div id="modal-overlay" class="modal-overlay" style="display:none">
-        <div class="modal">
+        </header>
+
+        <section class="card" id="deps-card">
+            <div class="card-head">
+                <h2 data-i18n="ui.deps_title">系统状态</h2>
+                <span id="deps-badge" class="badge badge-muted">…</span>
+            </div>
+            <div id="deps-list"></div>
+            <div class="card-foot">
+                <button id="install-btn" class="btn btn-warning" type="button" hidden data-i18n="install_deps">安装依赖</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-head">
+                <h2 data-i18n="ui.volumes_title">NTFS 卷</h2>
+                <span id="volumes-count" class="badge badge-muted">…</span>
+            </div>
+            <div id="volumes-list"></div>
+        </section>
+
+        <section class="card card-quiet">
+            <div id="about-block"></div>
+        </section>
+
+        <footer class="foot" data-i18n="ui.foot_hint">关闭窗口不会退出；退出请点菜单栏图标。</footer>
+    </main>
+
+    <div id="modal-overlay" class="modal-overlay" hidden>
+        <div class="modal" role="dialog" aria-modal="true">
             <div class="modal-header">
-                <h3 id="modal-title">Confirm</h3>
-                <button class="modal-close">&times;</button>
+                <h3 id="modal-title">…</h3>
+                <button class="modal-close" id="modal-close" type="button" aria-label="close">&times;</button>
             </div>
             <div class="modal-body" id="modal-body"></div>
             <div class="modal-footer">
-                <button class="btn btn-cancel" id="modal-cancel">Cancel</button>
-                <button class="btn btn-danger" id="modal-confirm">Confirm</button>
+                <button class="btn btn-ghost" id="modal-cancel" type="button">取消</button>
+                <button class="btn btn-danger" id="modal-confirm" type="button">确认</button>
             </div>
         </div>
     </div>
-    
-    <div id="toast-container"></div>
-    
+
+    <div id="toast-container" aria-live="polite"></div>
+
     <script src="app.js"></script>
 </body>
 </html>
