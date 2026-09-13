@@ -32,9 +32,43 @@ pub struct MountOptions {
     pub force_ntfs3g: bool,
 }
 
+/// Validate a single mount option before it is joined into the `-o`
+/// comma list. Options are passed as a single argv element (no shell
+/// involved), but a malformed option would silently corrupt the whole
+/// option string, so reject anything outside the well-formed charset
+/// early with a precise error instead of a confusing mount failure.
+fn validate_mount_option(opt: &str) -> Result<()> {
+    let bad = |why: &str| {
+        Err(Error::InvalidArgument(format!(
+            "invalid mount option `{opt}`: {why}"
+        )))
+    };
+    if opt.trim().is_empty() {
+        return bad("empty option");
+    }
+    if opt.contains(|c: char| {
+        c.is_whitespace() || matches!(c, ',' | ';' | '"' | '\'' | '\\' | '`' | '$' | '\0')
+    }) {
+        return bad(
+            "option must be a single token without whitespace or separator characters (`, ; \" ' \\ \\` $`)",
+        );
+    }
+    Ok(())
+}
+
+/// Validate every user-supplied mount option (config + per-call extras).
+pub fn validate_mount_options(options: &[String]) -> Result<()> {
+    for opt in options {
+        validate_mount_option(opt)?;
+    }
+    Ok(())
+}
+
 /// Mount an NTFS volume. `vol` should come from `device::list_volumes`
 /// so that the identifier and label are already validated.
 pub fn mount(vol: &Volume, opts: &MountOptions, cfg: &Config) -> Result<String> {
+    validate_mount_options(&cfg.mount_options)?;
+    validate_mount_options(&opts.extra_options)?;
     if vol.mounted {
         return Ok(vol
             .mount_point
@@ -208,6 +242,27 @@ fn diskutil_mount(dev_path: &str, mount_point: &str, opts: &[String]) -> bool {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn mount_option_validation_accepts_wellformed() {
+        assert!(validate_mount_options(&["big_writes".into()]).is_ok());
+        assert!(validate_mount_options(&["uid=501".into(), "auto_xattr".into()]).is_ok());
+        assert!(validate_mount_options(&[]).is_ok());
+    }
+
+    #[test]
+    fn mount_option_validation_rejects_bad_tokens() {
+        assert!(validate_mount_options(&["".into()]).is_err());
+        assert!(validate_mount_options(&["  ".into()]).is_err());
+        assert!(validate_mount_options(&["big writes".into()]).is_err());
+        assert!(validate_mount_options(&["a,b".into()]).is_err());
+        assert!(validate_mount_options(&["a;b".into()]).is_err());
+        assert!(validate_mount_options(&["a\"b".into()]).is_err());
+        assert!(validate_mount_options(&["a'b".into()]).is_err());
+        assert!(validate_mount_options(&["a\\b".into()]).is_err());
+        assert!(validate_mount_options(&["a$b".into()]).is_err());
+        assert!(validate_mount_options(&["a`b".into()]).is_err());
+    }
 
     #[test]
     fn build_mount_options_defaults() {

@@ -35,7 +35,7 @@ impl RunResult {
 }
 
 /// Configuration for a single subprocess.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RunOptions {
     /// Hard timeout. `None` disables the timeout.
     pub timeout: Option<Duration>,
@@ -43,10 +43,26 @@ pub struct RunOptions {
     pub env_extra: Vec<(String, String)>,
     /// Working directory override.
     pub cwd: Option<std::path::PathBuf>,
-    /// Capture stdout/stderr? Defaults to `true`.
+    /// Capture stdout/stderr? Defaults to `true`. When `false`, the
+    /// child inherits the parent's stdio (progress displays stay visible).
     pub capture: bool,
     /// Stream stdin (only meaningful when `capture` is `false`).
     pub stdin_data: Option<String>,
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self {
+            timeout: None,
+            env_extra: Vec::new(),
+            cwd: None,
+            // Manual Default (not derive): a bool derives to `false`,
+            // but capturing is the long-standing default behaviour —
+            // error reporting depends on the captured stderr.
+            capture: true,
+            stdin_data: None,
+        }
+    }
 }
 
 /// Runs a command with [`RunOptions`] and returns [`RunResult`].
@@ -58,12 +74,21 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
     let started = Instant::now();
 
     let mut command = Command::new(cmd);
-    command
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .env_remove("TERM"); // Prevent tools from emitting escape codes we cannot parse.
+    command.args(args).env_remove("TERM"); // Prevent tools from emitting escape codes we cannot parse.
+    if opts.capture {
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+    } else {
+        // Inherit mode: the child's output goes straight to the parent's
+        // terminals (used for long-running tools with progress output
+        // such as `rsync --progress`).
+        command
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+    }
     for (k, v) in &opts.env_extra {
         command.env(k, v);
     }
@@ -103,7 +128,12 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
         if let Some(mut handle) = stdout_handle {
             let mut out = Vec::new();
             let _ = handle.read_to_end(&mut out);
-            let _ = stdout_arc.lock().unwrap().write_all(&out);
+            // A poisoned mutex still holds valid data (the panic happened
+            // elsewhere); recovering it is strictly better than panicking.
+            let _ = stdout_arc
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .write_all(&out);
         }
     });
 
@@ -112,7 +142,10 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
         if let Some(mut handle) = stderr_handle {
             let mut err = Vec::new();
             let _ = handle.read_to_end(&mut err);
-            let _ = stderr_arc.lock().unwrap().write_all(&err);
+            let _ = stderr_arc
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .write_all(&err);
         }
     });
 
@@ -161,8 +194,18 @@ pub fn run(cmd: &str, args: &[&str], opts: &RunOptions) -> Result<RunResult> {
         None => -1,
     };
 
-    let stdout = String::from_utf8_lossy(&stdout_buf.lock().unwrap()).to_string();
-    let stderr = String::from_utf8_lossy(&stderr_buf.lock().unwrap()).to_string();
+    let stdout = String::from_utf8_lossy(
+        &stdout_buf
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
+    .to_string();
+    let stderr = String::from_utf8_lossy(
+        &stderr_buf
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
+    .to_string();
 
     Ok(RunResult {
         status,

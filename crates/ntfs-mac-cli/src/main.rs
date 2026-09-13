@@ -89,8 +89,10 @@ enum Command {
         target: String,
         #[arg(long)]
         label: Option<String>,
-        #[arg(long, default_value = "true")]
-        quick: bool,
+        /// Full format: zero the volume and scan for bad sectors
+        /// (much slower). Default is a quick format.
+        #[arg(long)]
+        full: bool,
         /// Sector size in bytes (512 or 4096)
         #[arg(long, default_value_t = 4096u32)]
         sector_size: u32,
@@ -176,8 +178,23 @@ fn main() -> ExitCode {
             } else {
                 eprintln!("{} {}", "error:".red().bold(), e);
             }
-            ExitCode::FAILURE
+            ExitCode::from(cli_exit_code(&e))
         }
+    }
+}
+
+/// Map a core error to the documented CLI exit codes (see README
+/// "退出码"): 2 missing dependency, 3 user cancelled, 4 confirmation
+/// mismatch, 5 invalid argument, 1 everything else. Errors that
+/// originate in the CLI layer (plain `anyhow!`) keep the generic 1.
+fn cli_exit_code(err: &anyhow::Error) -> u8 {
+    use ntfs_mac_core::Error as Core;
+    match err.downcast_ref::<Core>() {
+        Some(Core::MissingDependency { .. }) => 2,
+        Some(Core::Cancelled) => 3,
+        Some(Core::ConfirmationMismatch { .. }) => 4,
+        Some(Core::InvalidArgument(_)) => 5,
+        _ => 1,
     }
 }
 
@@ -252,14 +269,23 @@ fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Doctor => cmd_doctor(cli, &cfg),
         Command::List => cmd_list(cli, &cfg),
+        // Commands that shell out to the ntfs-3g toolchain pre-check the
+        // dependency set so the user gets one aggregated, actionable
+        // error (exit code 2) instead of a mid-operation failure.
         Command::Mount {
             target,
             mount_point,
             readonly,
             force_ntfs3g,
-        } => cmd_mount(cli, &cfg, target, mount_point, *readonly, *force_ntfs3g),
+        } => {
+            deps::require_ready()?;
+            cmd_mount(cli, &cfg, target, mount_point, *readonly, *force_ntfs3g)
+        }
         Command::Unmount { target } => cmd_unmount(cli, &cfg, target),
-        Command::Rw { target } => cmd_rw(cli, &cfg, target),
+        Command::Rw { target } => {
+            deps::require_ready()?;
+            cmd_rw(cli, &cfg, target)
+        }
         Command::Status => cmd_status(cli, &cfg),
         Command::Daemon {
             install,
@@ -270,23 +296,29 @@ fn run(cli: &Cli) -> Result<()> {
         Command::Format {
             target,
             label,
-            quick,
+            full,
             sector_size,
             cluster_size,
             yes,
-        } => cmd_format(
-            cli,
-            &cfg,
-            &FormatArgs {
-                target: target.clone(),
-                label: label.clone(),
-                quick: *quick,
-                sector_size: *sector_size,
-                cluster_size: *cluster_size,
-                yes: *yes,
-            },
-        ),
-        Command::Fix { target, fsck } => cmd_fix(cli, &cfg, target, *fsck),
+        } => {
+            deps::require_ready()?;
+            cmd_format(
+                cli,
+                &cfg,
+                &FormatArgs {
+                    target: target.clone(),
+                    label: label.clone(),
+                    quick: !*full,
+                    sector_size: *sector_size,
+                    cluster_size: *cluster_size,
+                    yes: *yes,
+                },
+            )
+        }
+        Command::Fix { target, fsck } => {
+            deps::require_ready()?;
+            cmd_fix(cli, &cfg, target, *fsck)
+        }
         Command::Copy {
             source,
             destination,
@@ -559,8 +591,51 @@ fn cmd_mount(
 }
 
 fn cmd_unmount(cli: &Cli, _cfg: &Config, target: &str) -> Result<()> {
-    // Look up by device identifier or volume name, then unmount the device.
     let volumes = device::list_volumes()?;
+
+    // Special case: "all" unmounts every mounted NTFS volume, mirroring
+    // `mount all`.
+    if target == "all" {
+        let mounted: Vec<_> = volumes.iter().filter(|v| v.mounted).collect();
+        if mounted.is_empty() {
+            if cli.json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({ "unmounted": [] }))?
+                );
+            } else {
+                println!("{}", "No mounted NTFS volumes found.".yellow());
+            }
+            return Ok(());
+        }
+        let mut unmounted = Vec::new();
+        let mut errors = Vec::new();
+        for vol in &mounted {
+            match mount::unmount(&vol.device_identifier) {
+                Ok(()) => unmounted.push(vol.device_identifier.clone()),
+                Err(e) => errors.push(format!("{}: {e}", vol.device_identifier)),
+            }
+        }
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "unmounted": unmounted,
+                    "errors": errors
+                }))?
+            );
+        } else {
+            for d in &unmounted {
+                println!("{} {}", "Unmounted".green().bold(), d);
+            }
+            for e in &errors {
+                eprintln!("{} {}", "Failed".red().bold(), e);
+            }
+        }
+        return Ok(());
+    }
+
+    // Look up by device identifier or volume name, then unmount the device.
     let vol = volumes
         .iter()
         .find(|v| v.device_identifier == target || v.volume_name == target)
@@ -810,27 +885,59 @@ fn cmd_daemon(
     }
     if install {
         let bin_path = std::env::current_exe()?;
-        let plist = daemon::install_launchagent(&bin_path)?;
+        let result = daemon::install_launchagent(&bin_path)?;
         println!(
             "{} installed: {}",
             "LaunchAgent".green().bold(),
-            plist.display()
+            result.plist_path.display()
         );
+        if result.loaded {
+            println!("  {}", "Daemon loaded and running now".green());
+        } else {
+            println!(
+                "  {} daemon could not be loaded now; it will start at next login.",
+                "warning:".yellow().bold()
+            );
+            if let Some(err) = &result.load_error {
+                println!("  Reason: {err}");
+            }
+        }
         println!("  Run: ntfs-mac daemon --uninstall to remove");
         println!("  Logs: ~/Library/Logs/ntfs-mac.err.log");
         return Ok(());
     }
     if status {
         let installed = daemon::is_launchagent_installed();
-        println!("{}", "Daemon Status".bold());
-        println!(
-            "  LaunchAgent: {}",
-            if installed {
-                "installed".green()
-            } else {
-                "not installed".yellow()
-            }
-        );
+        let loaded = installed && daemon::is_launchagent_loaded();
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "installed": installed,
+                    "loaded": loaded
+                }))?
+            );
+        } else {
+            println!("{}", "Daemon Status".bold());
+            println!(
+                "  LaunchAgent: {}",
+                if installed {
+                    "installed".green()
+                } else {
+                    "not installed".yellow()
+                }
+            );
+            println!(
+                "  Loaded in launchd: {}",
+                if loaded {
+                    "yes".green()
+                } else if installed {
+                    "no".yellow()
+                } else {
+                    "-".dimmed()
+                }
+            );
+        }
         return Ok(());
     }
     // Run daemon in foreground
@@ -863,6 +970,19 @@ fn cmd_daemon(
     }
 }
 
+/// Parse a boolean config value strictly. `config set` must not guess:
+/// an unparsable value for a safety switch (e.g. `require_confirmation`)
+/// would otherwise silently disable it. Uses the core `InvalidArgument`
+/// error so the CLI exit code is the documented 5.
+fn parse_config_bool(key: &str, value: &str) -> Result<bool> {
+    value.parse::<bool>().map_err(|_| {
+        ntfs_mac_core::Error::InvalidArgument(format!(
+            "invalid boolean value `{value}` for config key `{key}` (use `true` or `false`)"
+        ))
+        .into()
+    })
+}
+
 fn cmd_config(cli: &Cli, cfg: &Config, command: &ConfigCommand) -> Result<()> {
     match command {
         ConfigCommand::Show => {
@@ -879,10 +999,17 @@ fn cmd_config(cli: &Cli, cfg: &Config, command: &ConfigCommand) -> Result<()> {
             match key.as_str() {
                 "mount_base" => cfg.mount_base = value.clone(),
                 "fuse_driver" => cfg.fuse_driver = value.clone(),
-                "require_confirmation" => cfg.require_confirmation = value.parse().unwrap_or(false),
-                "color" => cfg.color = value.parse().unwrap_or(false),
+                // Strict parse: a typo must not silently disable a
+                // safety-relevant setting (e.g. `require_confirmation`).
+                "require_confirmation" => cfg.require_confirmation = parse_config_bool(key, value)?,
+                "color" => cfg.color = parse_config_bool(key, value)?,
                 "mount_options" => {
-                    cfg.mount_options = value.split(',').map(|s| s.trim().to_string()).collect()
+                    let opts: Vec<String> =
+                        value.split(',').map(|s| s.trim().to_string()).collect();
+                    // Reject malformed options at the entry point so the
+                    // user learns immediately, not at mount time.
+                    mount::validate_mount_options(&opts)?;
+                    cfg.mount_options = opts;
                 }
                 _ => return Err(anyhow::anyhow!("unknown config key: {}", key)),
             }
@@ -958,9 +1085,15 @@ fn cmd_sponsor(cli: &Cli, reveal: bool) -> Result<()> {
 
     if reveal {
         // `open -R` reveals the file in Finder (macOS).
-        let _ = std::process::Command::new("open")
+        let status = std::process::Command::new("open")
             .args(["-R", &path])
-            .spawn();
+            .status()
+            .map_err(|e| anyhow::anyhow!("cannot launch Finder: {e}"))?;
+        if !status.success() {
+            return Err(anyhow::anyhow!(
+                "Finder could not reveal `{path}` (exit status {status})"
+            ));
+        }
     }
 
     if cli.json {

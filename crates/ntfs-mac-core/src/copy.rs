@@ -104,11 +104,17 @@ fn copy_with_rsync(src: &Path, dst: &Path, opts: &CopyOptions) -> Result<CopyOut
     args.push(dst.to_string_lossy().to_string());
 
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    // With `--progress` the transfer output goes to rsync's stdout;
+    // capturing it would swallow the progress display entirely. Inherit
+    // the parent's stdio so the user actually sees it. (dry-run output
+    // is small and useful to capture.)
+    let capture = !(opts.progress && !opts.dry_run);
     run_expect_success(
         "rsync",
         &refs,
         &RunOptions {
             timeout: Some(Duration::from_secs(3600)),
+            capture,
             ..Default::default()
         },
     )?;

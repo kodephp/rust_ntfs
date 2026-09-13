@@ -73,10 +73,10 @@ crates/
 
 ### 安全
 1. **零 unsafe**：整个代码库不允许 `unsafe` 代码
-2. **零生产 unwrap**：生产路径不允许 `unwrap()`，测试中可以
+2. **零生产 unwrap**：生产路径不允许 `unwrap()`，测试中可以；锁获取用 `unwrap_or_else(PoisonError::into_inner)` 容忍 poison
 3. **破坏性操作强制确认**：format/erase 需要 `DestructiveToken` + 用户输入确认短语
-4. **命令隔离**：所有外部命令经 `runner::run` 统一执行，带 timeout，无 shell 注入
-5. **配置白名单**：不接受任意字符串注入到 mount 选项
+4. **命令隔离**：所有外部命令经 `runner::run` 统一执行，带 timeout，无 shell 注入；`RunOptions.capture` 默认 `true`（手动 Default），`false` 才继承 stdio
+5. **mount 选项校验**：`mount::validate_mount_options` 拒绝含空白/分隔符/引号等注入面字符的选项，config set 与挂载时双重把关
 
 ### 代码风格
 6. **PSR12 等价**：rustfmt 默认规则，不手写格式化
@@ -299,9 +299,9 @@ dist/pkg-payload/
 ### 验证
 
 ```bash
-pkgutil --payload-files dist/ntfs-mac-0.1.3.pkg    # 只应出现 Applications/ 与 usr/local/
-xar -tf dist/ntfs-mac-0.1.3.pkg | head             # 查看顶层结构
-pkgutil --check-signature dist/ntfs-mac-0.1.3.pkg  # 签名检查（未签名会退出码 1）
+pkgutil --payload-files dist/ntfs-mac-0.1.4.pkg    # 只应出现 Applications/ 与 usr/local/
+xar -tf dist/ntfs-mac-0.1.4.pkg | head             # 查看顶层结构
+pkgutil --check-signature dist/ntfs-mac-0.1.4.pkg  # 签名检查（未签名会退出码 1）
 ```
 
 ## 发布检查清单（Release Checklist）

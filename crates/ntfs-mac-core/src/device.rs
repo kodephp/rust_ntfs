@@ -104,11 +104,20 @@ pub fn list_volumes() -> Result<Vec<Volume>> {
             ..Default::default()
         },
     );
-    if let Ok(out) = mount_out {
-        if out.success() {
+    match mount_out {
+        Ok(out) if out.success() => {
             let mount_map = parse_mount_output(&out.stdout);
             enrich_with_mounts(&mut volumes, &mount_map);
         }
+        Ok(out) => tracing::warn!(
+            target: "ntfs_mac_core::device",
+            "`mount` probe exited with status {}; volumes may incorrectly appear unmounted",
+            out.status
+        ),
+        Err(e) => tracing::warn!(
+            target: "ntfs_mac_core::device",
+            "`mount` probe failed: {e}; volumes may incorrectly appear unmounted"
+        ),
     }
 
     Ok(volumes)

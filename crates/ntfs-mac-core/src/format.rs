@@ -103,25 +103,7 @@ pub fn format(
         }
     };
 
-    let mut args: Vec<String> = Vec::new();
-    if opts.quick {
-        args.push("-F".into());
-    }
-    if opts.sector_size == 4096 {
-        args.push("-f".into());
-        args.push("4096".into());
-    }
-    if opts.cluster_size == 4096 {
-        args.push("-c".into());
-        args.push("4096".into());
-    }
-    if !opts.label.is_empty() {
-        args.push("-L".into());
-        args.push(opts.label.clone());
-    }
-    for a in &opts.extra_args {
-        args.push(a.clone());
-    }
+    let mut args = build_mkntfs_args(opts);
     args.push(format!("/dev/{}", vol.device_identifier));
 
     let bin_str = bin_path.to_str().unwrap_or(bin_name);
@@ -136,6 +118,36 @@ pub fn format(
         },
     )?;
     Ok(())
+}
+
+/// Build the `mkntfs`/`newfs_ntfs` argument list from the options.
+///
+/// Flag mapping follows mkntfs(8) exactly:
+///
+/// * `-f`  — quick format (boolean; skips zeroing + bad-sector scan). The
+///   previous implementation wrongly used `-F` (force) for this and passed
+///   the sector size as `-f <n>`, which mkntfs reads as a stray positional
+///   operand — the command could never have succeeded.
+/// * `-s <n>` — sector size, always passed so user intent is explicit.
+/// * `-c <n>` — cluster size, always passed.
+/// * `-L <label>` — volume label.
+pub fn build_mkntfs_args(opts: &FormatOptions) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
+    if opts.quick {
+        args.push("-f".into());
+    }
+    args.push("-s".into());
+    args.push(opts.sector_size.to_string());
+    args.push("-c".into());
+    args.push(opts.cluster_size.to_string());
+    if !opts.label.is_empty() {
+        args.push("-L".into());
+        args.push(opts.label.clone());
+    }
+    for a in &opts.extra_args {
+        args.push(a.clone());
+    }
+    args
 }
 
 /// Validate a volume label for NTFS (max 11 chars, no special
@@ -179,6 +191,33 @@ mod tests {
         assert!(validate_label("a<b").is_some());
         assert!(validate_label("a>b").is_some());
         assert!(validate_label("a|b").is_some());
+    }
+
+    #[test]
+    fn mkntfs_args_quick_with_explicit_sizes() {
+        let opts = FormatOptions {
+            label: "Data".into(),
+            quick: true,
+            sector_size: 512,
+            cluster_size: 4096,
+            extra_args: Vec::new(),
+        };
+        let args = build_mkntfs_args(&opts);
+        assert_eq!(args, vec!["-f", "-s", "512", "-c", "4096", "-L", "Data"]);
+    }
+
+    #[test]
+    fn mkntfs_args_full_format_has_no_fast_flag() {
+        let opts = FormatOptions {
+            label: String::new(),
+            quick: false,
+            sector_size: 4096,
+            cluster_size: 8192,
+            extra_args: vec!["-v".into()],
+        };
+        let args = build_mkntfs_args(&opts);
+        assert_eq!(args, vec!["-s", "4096", "-c", "8192", "-v"]);
+        assert!(!args.contains(&"-f".to_string()));
     }
 
     #[test]

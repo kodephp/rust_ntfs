@@ -180,6 +180,9 @@ ntfs-mac mount disk2s2 --force-ntfs3g
 
 # 卸载
 ntfs-mac unmount disk2s2
+
+# 卸载所有已挂载的 NTFS 卷
+ntfs-mac unmount all
 ```
 
 ### `rw` — 只读转读写
@@ -224,13 +227,13 @@ ntfs-mac daemon
 # 自定义轮询间隔（秒，默认 3）
 ntfs-mac daemon --interval 5
 
-# 安装为 LaunchAgent（登录自启动）
+# 安装为 LaunchAgent（登录自启动，安装后立即加载运行）
 ntfs-mac daemon --install
 
-# 查看守护进程状态
+# 查看守护进程状态（支持 --json）
 ntfs-mac daemon --status
 
-# 卸载 LaunchAgent
+# 卸载 LaunchAgent（先停止运行中的守护进程，再删除 plist）
 ntfs-mac daemon --uninstall
 ```
 
@@ -244,7 +247,9 @@ LaunchAgent 路径：`~/Library/LaunchAgents/com.kodephp.ntfs-mac.plist`
 ```bash
 ntfs-mac format disk2s2
 ntfs-mac format disk2s2 --label "NewName"
-ntfs-mac format disk2s2 --label "NewName" --quick
+
+# 完整格式化（清零 + 坏道扫描，耗时远长于默认的快速格式化）
+ntfs-mac format disk2s2 --label "NewName" --full
 ```
 
 交互确认流程：
@@ -335,7 +340,7 @@ ntfs-mac license --json
 输出示例：
 
 ```
-ntfs-mac 0.1.3 — Apache-2.0
+ntfs-mac 0.1.4 — Apache-2.0
 Copyright 2026 kodephp contributors
 https://www.apache.org/licenses/LICENSE-2.0
 
@@ -442,8 +447,8 @@ VERSION=0.2.0 ./scripts/build-macos.sh
 发布前签名与公证（绕过 Gatekeeper）：
 
 ```bash
-codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.3.pkg
-xcrun notarytool submit dist/ntfs-mac-0.1.3.pkg --wait
+codesign --deep --force --sign "Developer ID Installer: Your Name" dist/ntfs-mac-0.1.4.pkg
+xcrun notarytool submit dist/ntfs-mac-0.1.4.pkg --wait
 ```
 
 ## 开发
@@ -557,8 +562,8 @@ cargo deny check                # 许可证 / bans / sources / advisories
 1. **破坏性操作强制确认**：`format` 要求 `DestructiveToken`，用户必须输入 `format <device> <label>` 才能继续。
 2. **只读保护**：`mount -r` 可强制只读挂载，防止意外写入。
 3. **命令隔离**：所有外部命令通过 `runner::run` 统一执行，带超时控制（SIGTERM → SIGKILL），无 shell 注入风险。
-4. **配置白名单**：`mount_options` 选项白名单过滤，不接受任意字符串。
-5. **无 unsafe 代码**：整个代码库零 `unsafe`，零 `unwrap` 在生产品路径上。
+4. **配置选项校验**：`mount_options` 每一项都会做格式校验（单 token、无空白/分隔符/引号等注入面字符），非法项在设置与挂载时直接报错，而不是透传给底层工具。
+5. **无 unsafe 代码**：整个代码库零 `unsafe`；生产路径零 `unwrap`（锁获取采用 poison 容忍恢复）。
 
 ## 退出码
 
@@ -583,7 +588,7 @@ A: 重新打开终端，或检查 `$PATH` 是否包含 `/usr/local/bin`（Intel�
 A: 前往 系统设置 → 隐私与安全性 → 滚动到底部批准。Intel Mac 可能还需要在 系统偏好设置 → 安全与隐私 → 通用 中允许。
 
 **Q: 格式化后 Windows 无法识别？**
-A: 确保使用 `--quick` 快速格式化（默认）。`--sector-size` 与 `--cluster-size` 已在 0.1.2 起开放，取值受限（扇区 512/4096，簇 512–65536 的 2 的幂）；不确定时保持默认 4096。
+A: 默认即为快速格式化（`-f`，跳过清零与坏道扫描）；如需彻底格式化加 `--full`。`--sector-size` 与 `--cluster-size` 已在 0.1.2 起开放，取值受限（扇区 512/4096，簇 512–65536 的 2 的幂），参数始终显式传给 mkntfs；不确定时保持默认 4096。
 
 ## 许可证
 
